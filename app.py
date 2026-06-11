@@ -1,57 +1,109 @@
-from flask import Flask, Response, request
-import time
+import asyncio
 import os
-import threading
+import time
+from collections import deque
 
-app = Flask(__name__)
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import HTMLResponse, StreamingResponse
 
-latest_frame = None
-last_update = 0
-SECRET_KEY = os.getenv('SECRET_KEY')
-frame_event = threading.Event()  # ← Yeni frame gelince sinyal gönderir
+load_dotenv()
 
-@app.route('/push', methods=['POST'])
-def push_frame():
-    global latest_frame, last_update
-    
-    key = request.headers.get('X-Secret-Key')
+app = FastAPI()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+latest_frame: bytes | None = None
+frame_event = asyncio.Event()
+frame_times: deque[float] = deque(maxlen=30)
+
+
+@app.post("/push")
+async def push_frame(request: Request):
+    global latest_frame
+
+    key = request.headers.get("X-Secret-Key")
     if key != SECRET_KEY:
-        return 'Unauthorized', 401
-    
-    latest_frame = request.data
-    last_update = time.time()
-    frame_event.set()    # ← Yeni frame geldi, stream'e haber ver
-    frame_event.clear()  # ← Hemen sıfırla
-    return 'OK', 200
+        return Response("Unauthorized", status_code=401)
 
-@app.route('/stream')
-def stream():
-    def generate():
+    latest_frame = await request.body()
+    frame_times.append(time.monotonic())
+    frame_event.set()
+    return {"status": "ok"}
+
+
+@app.get("/stream")
+async def stream():
+    async def generate():
         while True:
-            frame_event.wait(timeout=1.0)  # ← Frame gelene kadar bekle (max 1s)
-            if latest_frame:
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' +
-                       latest_frame + b'\r\n')
-    return Response(generate(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+            await frame_event.wait()
+            frame_event.clear()
+            if latest_frame is not None:
+                yield (b"--frame\r\n"
+                       b"Content-Type: image/jpeg\r\n\r\n" +
+                       latest_frame + b"\r\n")
 
-@app.route('/health')
-def health():
-    return {'status': 'ok', 'last_frame_age': time.time() - last_update}, 200
+    return StreamingResponse(
+        generate(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
 
-@app.route('/')
-def index():
-    return '''
+
+@app.get("/health")
+async def health():
+    fps = 0.0
+    if len(frame_times) >= 2:
+        elapsed = frame_times[-1] - frame_times[0]
+        if elapsed > 0:
+            fps = (len(frame_times) - 1) / elapsed
+
+    return {"status": "ok", "fps": round(fps, 1)}
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    return """
     <html>
-    <head><title>VisionGuard Remote</title></head>
-    <body style="background:black; margin:0; display:flex;
-                 justify-content:center; align-items:center;
-                 min-height:100vh;">
-        <img src="/stream" style="max-width:100%; height:auto;">
+    <head>
+        <title>VisionGuard Remote</title>
+        <style>
+            body {
+                background: black;
+                margin: 0;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                font-family: sans-serif;
+                color: white;
+            }
+            img {
+                max-width: 100%;
+                height: auto;
+            }
+            #fps {
+                margin-top: 10px;
+                font-size: 1.2em;
+            }
+        </style>
+    </head>
+    <body>
+        <img src="/stream">
+        <div id="fps">FPS: --</div>
+        <script>
+            async function updateFps() {
+                try {
+                    const res = await fetch('/health');
+                    const data = await res.json();
+                    document.getElementById('fps').textContent = 'FPS: ' + data.fps;
+                } catch (e) {
+                    document.getElementById('fps').textContent = 'FPS: --';
+                }
+            }
+            setInterval(updateFps, 2000);
+            updateFps();
+        </script>
     </body>
     </html>
-    '''
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+    """
