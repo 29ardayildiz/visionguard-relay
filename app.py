@@ -4,7 +4,7 @@ import time
 from collections import deque
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, StreamingResponse
 
 load_dotenv()
@@ -18,18 +18,25 @@ frame_event = asyncio.Event()
 frame_times: deque[float] = deque(maxlen=30)
 
 
-@app.post("/push")
-async def push_frame(request: Request):
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
     global latest_frame
-
-    key = request.headers.get("X-Secret-Key")
+    key = websocket.query_params.get("key")
     if key != SECRET_KEY:
-        return Response("Unauthorized", status_code=401)
+        await websocket.close(code=1008)
+        return
 
-    latest_frame = await request.body()
-    frame_times.append(time.monotonic())
-    frame_event.set()
-    return {"status": "ok"}
+    await websocket.accept()
+    print("ESP32 bağlandı")
+
+    try:
+        while True:
+            frame = await websocket.receive_bytes()
+            latest_frame = frame
+            frame_times.append(time.monotonic())
+            frame_event.set()
+    except WebSocketDisconnect:
+        print("ESP32 bağlantısı kesildi")
 
 
 @app.get("/stream")
@@ -38,7 +45,7 @@ async def stream():
         while True:
             await frame_event.wait()
             frame_event.clear()
-            if latest_frame is not None:
+            if latest_frame:
                 yield (b"--frame\r\n"
                        b"Content-Type: image/jpeg\r\n\r\n" +
                        latest_frame + b"\r\n")
@@ -56,7 +63,6 @@ async def health():
         elapsed = frame_times[-1] - frame_times[0]
         if elapsed > 0:
             fps = (len(frame_times) - 1) / elapsed
-
     return {"status": "ok", "fps": round(fps, 1)}
 
 
@@ -78,31 +84,30 @@ async def index():
                 font-family: sans-serif;
                 color: white;
             }
-            img {
-                max-width: 100%;
-                height: auto;
-            }
-            #fps {
-                margin-top: 10px;
-                font-size: 1.2em;
-            }
+            img { max-width: 100%; height: auto; }
+            #info { margin-top: 10px; font-size: 1.1em; text-align: center; }
         </style>
     </head>
     <body>
         <img src="/stream">
-        <div id="fps">FPS: --</div>
+        <div id="info">
+            <div id="status">⏳ Bekleniyor...</div>
+            <div id="fps">FPS: --</div>
+        </div>
         <script>
-            async function updateFps() {
+            async function update() {
                 try {
-                    const res = await fetch('/health');
-                    const data = await res.json();
-                    document.getElementById('fps').textContent = 'FPS: ' + data.fps;
-                } catch (e) {
-                    document.getElementById('fps').textContent = 'FPS: --';
+                    const r = await fetch('/health');
+                    const d = await r.json();
+                    document.getElementById('fps').textContent = 'FPS: ' + d.fps;
+                    document.getElementById('status').textContent =
+                        d.fps > 0 ? '🟢 Canlı' : '🔴 Bağlantı yok';
+                } catch(e) {
+                    document.getElementById('status').textContent = '🔴 Bağlantı yok';
                 }
             }
-            setInterval(updateFps, 2000);
-            updateFps();
+            setInterval(update, 2000);
+            update();
         </script>
     </body>
     </html>
