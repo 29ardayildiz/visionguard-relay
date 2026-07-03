@@ -876,7 +876,7 @@ async function getFromEsp() {
   try {
     const r = await fetch('/api/camera/get_from_esp', {method:'POST'});
     const d = await r.json();
-    if (r.ok) { setControls(d); showToast('✅ ESP32\'den alındı', true); }
+    if (r.ok) { setControls(d); showToast("✅ ESP32'den alındı", true); }
     else showToast(d.detail || 'Hata', false);
   } catch(e) { showToast('Bağlantı hatası', false); }
 }
