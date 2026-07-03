@@ -342,6 +342,16 @@ async def stream(_: str = Depends(get_current_user)):
 
 
 # ── Health endpoint ───────────────────────────────────────────────────────────
+def is_esp32_connected() -> bool:
+    """ESP32 is considered connected if frames arrived in the last 5 seconds
+    (HTTP push mode) OR a WebSocket is active (bidirectional mode)."""
+    if esp32_websocket is not None:
+        return True
+    if frame_times:
+        return (time.monotonic() - frame_times[-1]) < 5.0
+    return False
+
+
 @app.get("/health")
 async def health(_: str = Depends(get_current_user)):
     fps = 0.0
@@ -349,7 +359,9 @@ async def health(_: str = Depends(get_current_user)):
         elapsed = frame_times[-1] - frame_times[0]
         if elapsed > 0:
             fps = (len(frame_times) - 1) / elapsed
-    return {"status": "ok", "fps": round(fps, 1), "esp32_connected": esp32_websocket is not None}
+    connected = is_esp32_connected()
+    mode = "websocket" if esp32_websocket is not None else ("push" if connected else "none")
+    return {"status": "ok", "fps": round(fps, 1), "esp32_connected": connected, "mode": mode}
 
 
 # ── ESP32 push endpoint ───────────────────────────────────────────────────────
@@ -402,7 +414,7 @@ async def websocket_endpoint(websocket: WebSocket):
 # ── Camera API ────────────────────────────────────────────────────────────────
 @app.get("/api/camera/settings")
 async def get_camera_settings(_: str = Depends(get_current_user)):
-    return {**camera_settings, "esp32_connected": esp32_websocket is not None}
+    return {**camera_settings, "esp32_connected": is_esp32_connected()}
 
 
 @app.post("/api/camera/set")
@@ -428,7 +440,9 @@ async def set_camera_setting(request: Request, _: str = Depends(get_current_user
 @app.post("/api/camera/apply_all")
 async def apply_all_settings(_: str = Depends(get_current_user)):
     if esp32_websocket is None:
-        raise HTTPException(status_code=503, detail="ESP32 not connected")
+        # HTTP push mode: settings are stored server-side but cannot be pushed to ESP32
+        # Return success with a note so the UI doesn't show an error
+        return {"status": "ok", "applied": 0, "note": "push_mode"}
     count = 0
     for key, value in camera_settings.items():
         try:
@@ -443,7 +457,7 @@ async def apply_all_settings(_: str = Depends(get_current_user)):
 @app.post("/api/camera/get_from_esp")
 async def get_from_esp(_: str = Depends(get_current_user)):
     if esp32_websocket is None:
-        raise HTTPException(status_code=503, detail="ESP32 not connected")
+        raise HTTPException(status_code=503, detail="ESP32 WebSocket not connected (push-only mode)")
     esp32_settings_event.clear()
     try:
         await esp32_websocket.send_text(json.dumps({"cmd": "get_settings"}))
@@ -867,8 +881,15 @@ async function applyAll() {
   try {
     const r = await fetch('/api/camera/apply_all', {method:'POST'});
     const d = await r.json();
-    if (r.ok) showToast('✅ ' + d.applied + ' ayar uygulandı', true);
-    else showToast(d.detail || 'Hata', false);
+    if (r.ok) {
+      if (d.note === 'push_mode') {
+        showToast('⚠️ Ayarlar kaydedildi (WebSocket yok, push modu)', true);
+      } else {
+        showToast('✅ ' + d.applied + ' ayar uygulandı', true);
+      }
+    } else {
+      showToast(d.detail || 'Hata', false);
+    }
   } catch(e) { showToast('Bağlantı hatası', false); }
 }
 
