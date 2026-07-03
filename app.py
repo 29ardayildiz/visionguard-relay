@@ -6,6 +6,7 @@
 # Generate password hash: python3 -c "import bcrypt; print(bcrypt.hashpw(b'YOUR_PASSWORD', bcrypt.gensalt()).decode())"
 
 import asyncio
+import io
 import json
 import os
 import time
@@ -14,9 +15,10 @@ from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Request, Response, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from PIL import Image, ImageDraw
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -71,6 +73,8 @@ camera_settings: dict = {
     "dcw": 1,
     "colorbar": 0,
 }
+
+CAMERA_DEFAULTS = dict(camera_settings)
 
 esp32_websocket: WebSocket | None = None
 esp32_settings_event = asyncio.Event()
@@ -129,7 +133,7 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    if request.url.path not in ("/login",):
+    if request.url.path not in ("/login", "/manifest.json", "/icon.png"):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -140,11 +144,16 @@ LOGIN_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VisionGuard">
+  <meta name="theme-color" content="#1c1c1e">
+  <link rel="manifest" href="/manifest.json">
   <title>VisionGuard — Giriş</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #0a0a0a;
+      background: #1c1c1e;
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -152,9 +161,9 @@ LOGIN_HTML = """<!DOCTYPE html>
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
     .card {
-      background: #141414;
-      border: 1px solid #2a2a2a;
-      border-radius: 12px;
+      background: #2c2c2e;
+      border: 1px solid #3a3a3c;
+      border-radius: 16px;
       padding: 2.5rem 2rem;
       width: 100%;
       max-width: 400px;
@@ -163,40 +172,40 @@ LOGIN_HTML = """<!DOCTYPE html>
     .logo { text-align: center; margin-bottom: 1.5rem; }
     .logo h1 { font-size: 1.8rem; color: #fff; font-weight: 700; letter-spacing: -0.5px; }
     .logo span { font-size: 2rem; }
-    .subtitle { color: #888; font-size: 0.85rem; text-align: center; margin-top: 0.25rem; }
-    label { display: block; color: #aaa; font-size: 0.8rem; margin-bottom: 0.4rem; margin-top: 1.2rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    .subtitle { color: #8e8e93; font-size: 0.85rem; text-align: center; margin-top: 0.25rem; }
+    label { display: block; color: #aeaeb2; font-size: 0.8rem; margin-bottom: 0.4rem; margin-top: 1.2rem; text-transform: uppercase; letter-spacing: 0.5px; }
     input {
       width: 100%;
-      background: #1e1e1e;
-      border: 1px solid #333;
-      border-radius: 8px;
+      background: #1c1c1e;
+      border: 1px solid #3a3a3c;
+      border-radius: 10px;
       padding: 0.75rem 1rem;
       color: #fff;
       font-size: 1rem;
       outline: none;
       transition: border-color 0.2s;
     }
-    input:focus { border-color: #22c55e; }
+    input:focus { border-color: #30d158; }
     .btn {
       display: block;
       width: 100%;
       margin-top: 1.8rem;
       padding: 0.85rem;
-      background: #22c55e;
+      background: #30d158;
       color: #000;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 1rem;
       font-weight: 700;
       cursor: pointer;
       transition: background 0.2s;
     }
-    .btn:hover { background: #16a34a; }
+    .btn:hover { background: #28b34a; }
     .error {
       background: #3b0000;
       border: 1px solid #7f1d1d;
       color: #fca5a5;
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 0.75rem 1rem;
       font-size: 0.9rem;
       margin-top: 1.2rem;
@@ -271,6 +280,11 @@ VIEWER_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VisionGuard">
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="/manifest.json">
   <title>VisionGuard Remote</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -286,10 +300,10 @@ VIEWER_HTML = """<!DOCTYPE html>
     }
     img { max-width: 100%; height: auto; display: block; }
     #info { margin-top: 12px; font-size: 1rem; text-align: center; color: #ccc; }
-    #logout { position: fixed; top: 12px; right: 16px; color: #666; font-size: 0.8rem; text-decoration: none; }
+    #logout { position: fixed; top: 16px; right: 16px; color: #636366; font-size: 0.8rem; text-decoration: none; padding: 6px 12px; background: rgba(44,44,46,0.8); border-radius: 8px; backdrop-filter: blur(10px); }
     #logout:hover { color: #fff; }
-    #admin-link { position: fixed; top: 12px; left: 16px; color: #666; font-size: 0.8rem; text-decoration: none; }
-    #admin-link:hover { color: #22c55e; }
+    #admin-link { position: fixed; top: 16px; left: 16px; color: #636366; font-size: 0.8rem; text-decoration: none; padding: 6px 12px; background: rgba(44,44,46,0.8); border-radius: 8px; backdrop-filter: blur(10px); }
+    #admin-link:hover { color: #30d158; }
   </style>
 </head>
 <body>
@@ -343,8 +357,6 @@ async def stream(_: str = Depends(get_current_user)):
 
 # ── Health endpoint ───────────────────────────────────────────────────────────
 def is_esp32_connected() -> bool:
-    """ESP32 is considered connected if frames arrived in the last 5 seconds
-    (HTTP push mode) OR a WebSocket is active (bidirectional mode)."""
     if esp32_websocket is not None:
         return True
     if frame_times:
@@ -399,7 +411,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 if text.startswith("{"):
                     try:
                         data = json.loads(text)
-                        # Settings response from ESP32
                         if "framesize" in data or "quality" in data:
                             camera_settings.update({k: v for k, v in data.items() if k in camera_settings})
                             esp32_settings_event.set()
@@ -440,8 +451,6 @@ async def set_camera_setting(request: Request, _: str = Depends(get_current_user
 @app.post("/api/camera/apply_all")
 async def apply_all_settings(_: str = Depends(get_current_user)):
     if esp32_websocket is None:
-        # HTTP push mode: settings are stored server-side but cannot be pushed to ESP32
-        # Return success with a note so the UI doesn't show an error
         return {"status": "ok", "applied": 0, "note": "push_mode"}
     count = 0
     for key, value in camera_settings.items():
@@ -467,393 +476,473 @@ async def get_from_esp(_: str = Depends(get_current_user)):
     return {**camera_settings, "esp32_connected": True}
 
 
+# ── PWA endpoints ─────────────────────────────────────────────────────────────
+@app.get("/manifest.json")
+async def manifest():
+    return JSONResponse({
+        "name": "VisionGuard",
+        "short_name": "VisionGuard",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#1c1c1e",
+        "theme_color": "#1c1c1e",
+        "icons": [
+            {"src": "/icon.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/icon.png", "sizes": "512x512", "type": "image/png"},
+        ],
+    })
+
+
+@app.get("/icon.png")
+async def icon():
+    img = Image.new("RGB", (512, 512), color="#30d158")
+    draw = ImageDraw.Draw(img)
+    # Camera body
+    cx, cy = 256, 256
+    draw.rounded_rectangle([cx-140, cy-90, cx+140, cy+100], radius=28, fill="white")
+    # Lens outer
+    draw.ellipse([cx-70, cy-55, cx+70, cy+65], fill="#30d158")
+    # Lens inner
+    draw.ellipse([cx-48, cy-33, cx+48, cy+43], fill="white")
+    # Lens glass
+    draw.ellipse([cx-32, cy-17, cx+32, cy+27], fill="#1c1c1e")
+    # Viewfinder bump
+    draw.rounded_rectangle([cx-28, cy-110, cx+28, cy-88], radius=8, fill="white")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
+
+
 # ── Admin panel ───────────────────────────────────────────────────────────────
 ADMIN_HTML = """<!DOCTYPE html>
-<html lang="tr">
+<html class="dark" lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VisionGuard">
+  <meta name="theme-color" content="#1c1c1e">
+  <link rel="manifest" href="/manifest.json">
   <title>VisionGuard Admin</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #0a0a0a; --card: #141414; --border: #2a2a2a;
-      --text: #e5e5e5; --muted: #666; --accent: #22c55e;
-      --accent-dim: #15803d; --danger: #ef4444; --warn: #f59e0b;
-    }
-    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
-
-    /* Top bar */
-    .topbar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0.75rem 1.5rem;
-      background: var(--card); border-bottom: 1px solid var(--border);
-      position: sticky; top: 0; z-index: 100;
-    }
-    .topbar-left { display: flex; align-items: center; gap: 0.75rem; }
-    .topbar h1 { font-size: 1.1rem; font-weight: 700; }
-    .topbar-right { display: flex; align-items: center; gap: 1rem; }
-    #esp-status { font-size: 0.85rem; }
-    a.btn-link { color: var(--muted); font-size: 0.85rem; text-decoration: none; }
-    a.btn-link:hover { color: var(--text); }
-
-    /* Layout */
-    .layout { display: flex; gap: 0; height: calc(100vh - 49px); }
-    .left-panel { width: 40%; min-width: 280px; border-right: 1px solid var(--border); display: flex; flex-direction: column; }
-    .right-panel { flex: 1; overflow-y: auto; padding: 1rem; }
-
-    /* Preview */
-    .preview-wrap { flex: 1; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-    .preview-wrap img { width: 100%; height: 100%; object-fit: contain; }
-    .preview-info { padding: 0.75rem 1rem; background: var(--card); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--muted); }
-
-    /* Presets */
-    .presets { padding: 0.75rem 1rem; border-top: 1px solid var(--border); background: var(--card); }
-    .presets h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 0.5rem; }
-    .preset-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-    .preset-btn {
-      padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--border);
-      background: #1e1e1e; color: var(--text); font-size: 0.8rem; cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
-    }
-    .preset-btn:hover { border-color: var(--accent); background: #1a2e1a; }
-
-    /* Settings sections */
-    .section { margin-bottom: 1.25rem; }
-    .section-header {
-      font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.5px; color: var(--muted); padding: 0.5rem 0;
-      border-bottom: 1px solid var(--border); margin-bottom: 0.75rem;
-    }
-    .control-row {
-      display: flex; align-items: center; gap: 0.75rem;
-      padding: 0.4rem 0;
-    }
-    .control-row label { flex: 0 0 140px; font-size: 0.82rem; color: #aaa; }
-    .control-row .input-wrap { flex: 1; display: flex; align-items: center; gap: 0.5rem; }
-    .val-display { min-width: 32px; text-align: right; font-size: 0.8rem; color: var(--accent); font-variant-numeric: tabular-nums; }
-
-    input[type=range] {
-      flex: 1; -webkit-appearance: none; height: 4px;
-      background: #333; border-radius: 2px; outline: none;
-    }
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 14px; height: 14px;
-      background: var(--accent); border-radius: 50%; cursor: pointer;
-    }
-    select, input[type=range] { cursor: pointer; }
-    select {
-      flex: 1; background: #1e1e1e; border: 1px solid var(--border);
-      border-radius: 6px; color: var(--text); padding: 0.35rem 0.5rem;
-      font-size: 0.85rem; outline: none;
-    }
-    select:focus { border-color: var(--accent); }
-
-    /* Toggle */
-    .toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
-    .toggle input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider {
-      position: absolute; inset: 0; background: #333; border-radius: 10px;
-      cursor: pointer; transition: background 0.2s;
-    }
-    .toggle-slider::before {
-      content: ''; position: absolute; width: 14px; height: 14px;
-      left: 3px; top: 3px; background: #888; border-radius: 50%;
-      transition: transform 0.2s, background 0.2s;
-    }
-    .toggle input:checked + .toggle-slider { background: var(--accent-dim); }
-    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: var(--accent); }
-
-    /* Action buttons */
-    .action-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
-    .btn {
-      padding: 0.45rem 1rem; border-radius: 7px; font-size: 0.85rem;
-      font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s;
-    }
-    .btn:hover { opacity: 0.85; }
-    .btn-green { background: var(--accent); color: #000; }
-    .btn-gray { background: #2a2a2a; color: var(--text); }
-    .btn-blue { background: #2563eb; color: #fff; }
-
-    /* Toast */
+    body { font-family: 'Inter', sans-serif; background-color: #1c1c1e; color: #e3e2e7; -webkit-font-smoothing: antialiased; }
+    .mac-slider { -webkit-appearance: none; width: 100%; height: 4px; background: #3a3a3c; border-radius: 2px; outline: none; }
+    .mac-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; background: #ffffff; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 0.5px solid rgba(0,0,0,0.1); }
+    .ios-toggle { display: none; }
+    .ios-toggle-label { display: block; background: #3a3a3c; border-radius: 999px; height: 28px; width: 50px; cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; }
+    .ios-toggle-label::after { content: ''; position: absolute; top: 3px; left: 3px; background: white; border-radius: 50%; height: 22px; width: 22px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    .ios-toggle:checked + .ios-toggle-label { background-color: #30d158; }
+    .ios-toggle:checked + .ios-toggle-label::after { transform: translateX(22px); }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #1c1c1e; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #3a3a3c; border-radius: 3px; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    select { -webkit-appearance: none; appearance: none; }
     #toast {
-      position: fixed; bottom: 1.5rem; right: 1.5rem;
-      padding: 0.65rem 1.1rem; border-radius: 8px; font-size: 0.88rem;
-      font-weight: 500; opacity: 0; pointer-events: none;
-      transition: opacity 0.2s; z-index: 999;
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 500;
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 9999;
+      white-space: nowrap;
     }
     #toast.show { opacity: 1; }
-    #toast.ok { background: #14532d; color: #86efac; border: 1px solid #166534; }
-    #toast.err { background: #450a0a; color: #fca5a5; border: 1px solid #7f1d1d; }
+    #toast.ok { background: rgba(48,209,88,0.2); color: #30d158; border: 1px solid rgba(48,209,88,0.3); }
+    #toast.err { background: rgba(255,69,58,0.2); color: #ff453a; border: 1px solid rgba(255,69,58,0.3); }
+    @media (max-width: 768px) {
+      .mobile-stack { flex-direction: column !important; }
+      .stream-section { border-right: none !important; border-bottom: 1px solid #3a3a3c; max-height: 60vh; }
+    }
   </style>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary-container": "#30d158", "outline": "#869583",
+            "surface-dim": "#121317", "on-primary": "#003910",
+            "surface-container": "#1e1f23", "surface": "#121317",
+            "primary": "#55ee71", "on-surface": "#e3e2e7",
+            "on-surface-variant": "#bccbb7", "background": "#121317",
+            "surface-variant": "#343539", "outline-variant": "#3d4a3b",
+          }
+        }
+      }
+    }
+  </script>
 </head>
-<body>
-<div class="topbar">
-  <div class="topbar-left">
-    <span>📷</span>
-    <h1>VisionGuard Admin</h1>
+<body class="h-screen flex flex-col overflow-hidden">
+
+<!-- Top bar -->
+<header class="flex justify-between items-center w-full px-8 h-14 bg-[#1e1f23] border-b border-[#3d4a3b] z-50 flex-shrink-0">
+  <div class="flex items-center gap-4">
+    <span class="text-lg font-bold text-white tracking-tight">VisionGuard</span>
+    <span class="text-xs text-[#636366] hidden md:block">Admin Panel</span>
   </div>
-  <div class="topbar-right">
-    <span id="esp-status">🔴 ESP32 bağlı değil</span>
-    <a href="/" class="btn-link">← Görüntü</a>
-    <a href="/logout" class="btn-link">Çıkış</a>
+  <div class="flex items-center gap-3">
+    <div id="esp-badge" class="flex items-center gap-1.5 bg-[#2c2c2e] px-3 py-1.5 rounded-full border border-[#3a3a3c] text-xs text-[#aeaeb2]">
+      <span id="esp-dot" class="w-2 h-2 rounded-full bg-[#3a3a3c]"></span>
+      <span id="esp-label">ESP32: --</span>
+    </div>
+    <a href="/" class="text-[#636366] hover:text-white text-xs px-3 py-1.5 rounded-lg hover:bg-[#2c2c2e] transition-colors">Live</a>
+    <a href="/logout" class="text-[#636366] hover:text-white text-xs px-3 py-1.5 rounded-lg hover:bg-[#2c2c2e] transition-colors flex items-center gap-1">
+      Logout <span class="material-symbols-outlined text-sm">logout</span>
+    </a>
   </div>
-</div>
+</header>
 
-<div class="layout">
-  <!-- Left: preview -->
-  <div class="left-panel">
-    <div class="preview-wrap">
-      <img src="/stream" alt="Live">
-    </div>
-    <div class="preview-info">
-      <span id="fps-display">FPS: --</span>
-      <span id="conn-display">--</span>
-    </div>
-    <div class="presets">
-      <h3>Hızlı Ön Ayar</h3>
-      <div class="preset-btns">
-        <button class="preset-btn" onclick="applyPreset('hq')">🎯 Yüksek Kalite</button>
-        <button class="preset-btn" onclick="applyPreset('hfps')">⚡ Yüksek FPS</button>
-        <button class="preset-btn" onclick="applyPreset('night')">🌙 Gece Modu</button>
+<main class="flex flex-1 overflow-hidden mobile-stack">
+
+  <!-- Left: stream + presets (40%) -->
+  <section class="stream-section w-full md:w-[40%] bg-[#1c1c1e] border-r border-[#3a3a3c] flex flex-col overflow-y-auto custom-scrollbar flex-shrink-0">
+
+    <!-- Stream -->
+    <div class="p-4 space-y-3">
+      <div class="flex justify-between items-center">
+        <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+          <span id="live-dot" class="w-2 h-2 rounded-full bg-[#3a3a3c]"></span>
+          Live Feed
+        </h2>
+        <span id="fps-badge" class="text-xs font-mono text-[#30d158] bg-[#2c2c2e] px-2 py-0.5 rounded border border-[#3a3a3c]">-- FPS</span>
       </div>
-    </div>
-  </div>
-
-  <!-- Right: controls -->
-  <div class="right-panel">
-    <div class="action-bar">
-      <button class="btn btn-green" onclick="applyAll()">✅ Tümünü Uygula</button>
-      <button class="btn btn-blue" onclick="getFromEsp()">🔄 ESP32'den Al</button>
-      <button class="btn btn-gray" onclick="resetDefaults()">↩ Varsayılana Sıfırla</button>
-    </div>
-
-    <!-- Resolution & Quality -->
-    <div class="section">
-      <div class="section-header">📐 Çözünürlük & Kalite</div>
-      <div class="control-row">
-        <label>Çözünürlük</label>
-        <div class="input-wrap">
-          <select id="framesize" onchange="setSetting('framesize', +this.value)">
-            <option value="0">96x96</option><option value="1">QQVGA 160x120</option>
-            <option value="2">QCIF 176x144</option><option value="3">HQVGA 240x176</option>
-            <option value="4">240x240</option><option value="5">QVGA 320x240</option>
-            <option value="6">CIF 400x296</option><option value="7">HVGA 480x320</option>
-            <option value="8">VGA 640x480</option><option value="9">SVGA 800x600</option>
-            <option value="10">XGA 1024x768</option><option value="11">HD 1280x720</option>
-            <option value="12">SXGA 1280x1024</option><option value="13">UXGA 1600x1200</option>
-          </select>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>Kalite (düşük=iyi)</label>
-        <div class="input-wrap">
-          <input type="range" id="quality" min="4" max="63" oninput="updateVal('quality');setSetting('quality',+this.value)">
-          <span class="val-display" id="quality-val">12</span>
-        </div>
+      <div class="relative bg-black rounded-xl overflow-hidden border border-[#3a3a3c] aspect-video flex items-center justify-center">
+        <img src="/stream" alt="Live" class="w-full h-full object-contain absolute inset-0">
+        <span class="material-symbols-outlined text-5xl text-[#3a3a3c] z-0">videocam</span>
       </div>
     </div>
 
-    <!-- Color & Effects -->
-    <div class="section">
-      <div class="section-header">🎨 Renk & Efekt</div>
-      <div class="control-row">
-        <label>Parlaklık</label>
-        <div class="input-wrap">
-          <input type="range" id="brightness" min="-2" max="2" oninput="updateVal('brightness');setSetting('brightness',+this.value)">
-          <span class="val-display" id="brightness-val">0</span>
-        </div>
+    <!-- Presets -->
+    <div class="px-4 pb-4 space-y-2">
+      <p class="text-[10px] font-semibold text-[#636366] uppercase tracking-widest">Quick Presets</p>
+      <div class="grid grid-cols-3 gap-2 p-1 bg-[#2c2c2e] rounded-xl border border-[#3a3a3c]">
+        <button onclick="applyPreset('hq')" class="text-white py-2.5 rounded-lg text-xs font-semibold hover:bg-[#3a3a3c] transition-all active:scale-95">High Quality</button>
+        <button onclick="applyPreset('hfps')" class="text-[#aeaeb2] py-2.5 rounded-lg text-xs font-semibold hover:bg-[#3a3a3c] transition-all active:scale-95">High FPS</button>
+        <button onclick="applyPreset('night')" class="text-[#aeaeb2] py-2.5 rounded-lg text-xs font-semibold hover:bg-[#3a3a3c] transition-all active:scale-95">Night Mode</button>
       </div>
-      <div class="control-row">
-        <label>Kontrast</label>
-        <div class="input-wrap">
-          <input type="range" id="contrast" min="-2" max="2" oninput="updateVal('contrast');setSetting('contrast',+this.value)">
-          <span class="val-display" id="contrast-val">0</span>
+    </div>
+  </section>
+
+  <!-- Right: settings (60%) -->
+  <section class="flex-1 flex flex-col overflow-hidden bg-[#1c1c1e]">
+    <div class="flex-1 overflow-y-auto p-4 custom-scrollbar pb-24">
+      <div class="max-w-2xl mx-auto space-y-4">
+
+        <!-- Imaging Card -->
+        <div class="bg-[#2c2c2e] rounded-xl border border-[#3a3a3c] overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-[#3a3a3c] bg-[#343436]/30 flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#30d158] text-base">photo_camera</span>
+            <h3 class="text-sm font-semibold text-white">Imaging Controls</h3>
+          </div>
+          <div class="p-4 space-y-5">
+
+            <!-- Resolution -->
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">Resolution</label>
+              <select id="framesize" onchange="setSetting('framesize', +this.value)"
+                class="flex-1 bg-[#1c1c1e] border border-[#3a3a3c] text-white text-xs rounded-lg px-3 py-2.5 outline-none focus:border-[#30d158] transition-colors min-h-[44px]">
+                <option value="0">96x96</option>
+                <option value="1">QQVGA 160x120</option>
+                <option value="2">QCIF 176x144</option>
+                <option value="3">HQVGA 240x176</option>
+                <option value="4">240x240</option>
+                <option value="5">QVGA 320x240</option>
+                <option value="6">CIF 400x296</option>
+                <option value="7">HVGA 480x320</option>
+                <option value="8">VGA 640x480</option>
+                <option value="9">SVGA 800x600</option>
+                <option value="10">XGA 1024x768</option>
+                <option value="11">HD 1280x720</option>
+                <option value="12">SXGA 1280x1024</option>
+                <option value="13">UXGA 1600x1200</option>
+              </select>
+            </div>
+
+            <!-- Quality -->
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-white w-28 flex-shrink-0">JPEG Quality <span class="text-[#636366]">(low=best)</span></label>
+              <div class="flex-1 flex items-center gap-3">
+                <input type="range" id="quality" class="mac-slider" min="4" max="63"
+                  oninput="syncVal('quality');setSetting('quality',+this.value)">
+                <span id="quality-val" class="text-xs font-mono text-[#30d158] w-8 text-right">12</span>
+              </div>
+            </div>
+
+            <hr class="border-[#3a3a3c]"/>
+
+            <!-- Brightness -->
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">Brightness</label>
+              <div class="flex-1 flex items-center gap-3">
+                <input type="range" id="brightness" class="mac-slider" min="-2" max="2"
+                  oninput="syncVal('brightness');setSetting('brightness',+this.value)">
+                <span id="brightness-val" class="text-xs font-mono text-white w-8 text-right">0</span>
+              </div>
+            </div>
+
+            <!-- Contrast -->
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">Contrast</label>
+              <div class="flex-1 flex items-center gap-3">
+                <input type="range" id="contrast" class="mac-slider" min="-2" max="2"
+                  oninput="syncVal('contrast');setSetting('contrast',+this.value)">
+                <span id="contrast-val" class="text-xs font-mono text-white w-8 text-right">0</span>
+              </div>
+            </div>
+
+            <!-- Saturation -->
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">Saturation</label>
+              <div class="flex-1 flex items-center gap-3">
+                <input type="range" id="saturation" class="mac-slider" min="-2" max="2"
+                  oninput="syncVal('saturation');setSetting('saturation',+this.value)">
+                <span id="saturation-val" class="text-xs font-mono text-white w-8 text-right">0</span>
+              </div>
+            </div>
+
+            <!-- Sharpness -->
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">Sharpness</label>
+              <div class="flex-1 flex items-center gap-3">
+                <input type="range" id="sharpness" class="mac-slider" min="-2" max="2"
+                  oninput="syncVal('sharpness');setSetting('sharpness',+this.value)">
+                <span id="sharpness-val" class="text-xs font-mono text-white w-8 text-right">0</span>
+              </div>
+            </div>
+
+            <!-- Denoise -->
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">Denoise</label>
+              <div class="flex-1 flex items-center gap-3">
+                <input type="range" id="denoise" class="mac-slider" min="0" max="255"
+                  oninput="syncVal('denoise');setSetting('denoise',+this.value)">
+                <span id="denoise-val" class="text-xs font-mono text-white w-8 text-right">0</span>
+              </div>
+            </div>
+
+            <!-- Special Effect -->
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">Special Effect</label>
+              <select id="special_effect" onchange="setSetting('special_effect', +this.value)"
+                class="flex-1 bg-[#1c1c1e] border border-[#3a3a3c] text-white text-xs rounded-lg px-3 py-2.5 outline-none focus:border-[#30d158] transition-colors min-h-[44px]">
+                <option value="0">None</option>
+                <option value="1">Negative</option>
+                <option value="2">Grayscale</option>
+                <option value="3">Red Tint</option>
+                <option value="4">Green Tint</option>
+                <option value="5">Blue Tint</option>
+                <option value="6">Sepia</option>
+              </select>
+            </div>
+
+          </div>
         </div>
-      </div>
-      <div class="control-row">
-        <label>Doygunluk</label>
-        <div class="input-wrap">
-          <input type="range" id="saturation" min="-2" max="2" oninput="updateVal('saturation');setSetting('saturation',+this.value)">
-          <span class="val-display" id="saturation-val">0</span>
+
+        <!-- White Balance Card -->
+        <div class="bg-[#2c2c2e] rounded-xl border border-[#3a3a3c] overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-[#3a3a3c] bg-[#343436]/30 flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#30d158] text-base">wb_sunny</span>
+            <h3 class="text-sm font-semibold text-white">White Balance</h3>
+          </div>
+          <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div class="flex items-center justify-between min-h-[44px]">
+              <span class="text-xs text-[#aeaeb2]">White Balance</span>
+              <div><input type="checkbox" id="whitebal" class="ios-toggle" onchange="setSetting('whitebal', this.checked?1:0)"><label for="whitebal" class="ios-toggle-label"></label></div>
+            </div>
+
+            <div class="flex items-center justify-between min-h-[44px]">
+              <span class="text-xs text-[#aeaeb2]">AWB Gain</span>
+              <div><input type="checkbox" id="awb_gain" class="ios-toggle" onchange="setSetting('awb_gain', this.checked?1:0)"><label for="awb_gain" class="ios-toggle-label"></label></div>
+            </div>
+
+            <div class="flex items-center gap-4 md:col-span-2">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">WB Mode</label>
+              <select id="wb_mode" onchange="setSetting('wb_mode', +this.value)"
+                class="flex-1 bg-[#1c1c1e] border border-[#3a3a3c] text-white text-xs rounded-lg px-3 py-2.5 outline-none focus:border-[#30d158] transition-colors min-h-[44px]">
+                <option value="0">Auto</option>
+                <option value="1">Sunny</option>
+                <option value="2">Cloudy</option>
+                <option value="3">Office</option>
+                <option value="4">Home</option>
+              </select>
+            </div>
+
+          </div>
         </div>
-      </div>
-      <div class="control-row">
-        <label>Netlik</label>
-        <div class="input-wrap">
-          <input type="range" id="sharpness" min="-2" max="2" oninput="updateVal('sharpness');setSetting('sharpness',+this.value)">
-          <span class="val-display" id="sharpness-val">0</span>
+
+        <!-- Exposure Card -->
+        <div class="bg-[#2c2c2e] rounded-xl border border-[#3a3a3c] overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-[#3a3a3c] bg-[#343436]/30 flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#30d158] text-base">shutter_speed</span>
+            <h3 class="text-sm font-semibold text-white">Exposure &amp; Gain</h3>
+          </div>
+          <div class="p-4 space-y-5">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="flex items-center justify-between min-h-[44px]">
+                <span class="text-xs text-[#aeaeb2]">Exposure Control</span>
+                <div><input type="checkbox" id="exposure_ctrl" class="ios-toggle" onchange="setSetting('exposure_ctrl', this.checked?1:0)"><label for="exposure_ctrl" class="ios-toggle-label"></label></div>
+              </div>
+              <div class="flex items-center justify-between min-h-[44px]">
+                <span class="text-xs text-[#aeaeb2]">AEC2</span>
+                <div><input type="checkbox" id="aec2" class="ios-toggle" onchange="setSetting('aec2', this.checked?1:0)"><label for="aec2" class="ios-toggle-label"></label></div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">AE Level</label>
+              <div class="flex-1 flex items-center gap-3">
+                <input type="range" id="ae_level" class="mac-slider" min="-2" max="2"
+                  oninput="syncVal('ae_level');setSetting('ae_level',+this.value)">
+                <span id="ae_level-val" class="text-xs font-mono text-white w-8 text-right">0</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">AEC Value</label>
+              <div class="flex-1 flex items-center gap-3">
+                <input type="range" id="aec_value" class="mac-slider" min="0" max="1200"
+                  oninput="syncVal('aec_value');setSetting('aec_value',+this.value)">
+                <span id="aec_value-val" class="text-xs font-mono text-white w-8 text-right">300</span>
+              </div>
+            </div>
+
+            <hr class="border-[#3a3a3c]"/>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="flex items-center justify-between min-h-[44px]">
+                <span class="text-xs text-[#aeaeb2]">Gain Control</span>
+                <div><input type="checkbox" id="gain_ctrl" class="ios-toggle" onchange="setSetting('gain_ctrl', this.checked?1:0)"><label for="gain_ctrl" class="ios-toggle-label"></label></div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">AGC Gain</label>
+              <div class="flex-1 flex items-center gap-3">
+                <input type="range" id="agc_gain" class="mac-slider" min="0" max="30"
+                  oninput="syncVal('agc_gain');setSetting('agc_gain',+this.value)">
+                <span id="agc_gain-val" class="text-xs font-mono text-white w-8 text-right">0</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+              <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">Gain Ceiling</label>
+              <select id="gainceiling" onchange="setSetting('gainceiling', +this.value)"
+                class="flex-1 bg-[#1c1c1e] border border-[#3a3a3c] text-white text-xs rounded-lg px-3 py-2.5 outline-none focus:border-[#30d158] transition-colors min-h-[44px]">
+                <option value="0">2x</option>
+                <option value="1">4x</option>
+                <option value="2">8x</option>
+                <option value="3">16x</option>
+                <option value="4">32x</option>
+                <option value="5">64x</option>
+                <option value="6">128x</option>
+              </select>
+            </div>
+
+          </div>
         </div>
-      </div>
-      <div class="control-row">
-        <label>Gürültü Azaltma</label>
-        <div class="input-wrap">
-          <input type="range" id="denoise" min="0" max="255" oninput="updateVal('denoise');setSetting('denoise',+this.value)">
-          <span class="val-display" id="denoise-val">0</span>
+
+        <!-- Advanced Card -->
+        <div class="bg-[#2c2c2e] rounded-xl border border-[#3a3a3c] overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-[#3a3a3c] bg-[#343436]/30 flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#30d158] text-base">tune</span>
+            <h3 class="text-sm font-semibold text-white">Advanced</h3>
+          </div>
+          <div class="p-4 grid grid-cols-2 gap-4">
+
+            <div class="flex items-center justify-between min-h-[44px]">
+              <span class="text-xs text-[#aeaeb2]">BPC</span>
+              <div><input type="checkbox" id="bpc" class="ios-toggle" onchange="setSetting('bpc', this.checked?1:0)"><label for="bpc" class="ios-toggle-label"></label></div>
+            </div>
+
+            <div class="flex items-center justify-between min-h-[44px]">
+              <span class="text-xs text-[#aeaeb2]">WPC</span>
+              <div><input type="checkbox" id="wpc" class="ios-toggle" onchange="setSetting('wpc', this.checked?1:0)"><label for="wpc" class="ios-toggle-label"></label></div>
+            </div>
+
+            <div class="flex items-center justify-between min-h-[44px]">
+              <span class="text-xs text-[#aeaeb2]">Raw GMA</span>
+              <div><input type="checkbox" id="raw_gma" class="ios-toggle" onchange="setSetting('raw_gma', this.checked?1:0)"><label for="raw_gma" class="ios-toggle-label"></label></div>
+            </div>
+
+            <div class="flex items-center justify-between min-h-[44px]">
+              <span class="text-xs text-[#aeaeb2]">LENC</span>
+              <div><input type="checkbox" id="lenc" class="ios-toggle" onchange="setSetting('lenc', this.checked?1:0)"><label for="lenc" class="ios-toggle-label"></label></div>
+            </div>
+
+            <div class="flex items-center justify-between min-h-[44px]">
+              <span class="text-xs text-[#aeaeb2]">H-Mirror</span>
+              <div><input type="checkbox" id="hmirror" class="ios-toggle" onchange="setSetting('hmirror', this.checked?1:0)"><label for="hmirror" class="ios-toggle-label"></label></div>
+            </div>
+
+            <div class="flex items-center justify-between min-h-[44px]">
+              <span class="text-xs text-[#aeaeb2]">V-Flip</span>
+              <div><input type="checkbox" id="vflip" class="ios-toggle" onchange="setSetting('vflip', this.checked?1:0)"><label for="vflip" class="ios-toggle-label"></label></div>
+            </div>
+
+            <div class="flex items-center justify-between min-h-[44px]">
+              <span class="text-xs text-[#aeaeb2]">DCW</span>
+              <div><input type="checkbox" id="dcw" class="ios-toggle" onchange="setSetting('dcw', this.checked?1:0)"><label for="dcw" class="ios-toggle-label"></label></div>
+            </div>
+
+            <div class="flex items-center justify-between min-h-[44px]">
+              <span class="text-xs text-[#aeaeb2]">Colorbar</span>
+              <div><input type="checkbox" id="colorbar" class="ios-toggle" onchange="setSetting('colorbar', this.checked?1:0)"><label for="colorbar" class="ios-toggle-label"></label></div>
+            </div>
+
+          </div>
         </div>
-      </div>
-      <div class="control-row">
-        <label>Özel Efekt</label>
-        <div class="input-wrap">
-          <select id="special_effect" onchange="setSetting('special_effect', +this.value)">
-            <option value="0">Yok</option><option value="1">Negatif</option>
-            <option value="2">Gri Ton</option><option value="3">Kırmızı Ton</option>
-            <option value="4">Yeşil Ton</option><option value="5">Mavi Ton</option>
-            <option value="6">Sepya</option>
-          </select>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>Beyaz Denge</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="whitebal" onchange="setSetting('whitebal', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>AWB Kazancı</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="awb_gain" onchange="setSetting('awb_gain', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>WB Modu</label>
-        <div class="input-wrap">
-          <select id="wb_mode" onchange="setSetting('wb_mode', +this.value)">
-            <option value="0">Otomatik</option><option value="1">Güneşli</option>
-            <option value="2">Bulutlu</option><option value="3">Ofis</option><option value="4">Ev</option>
-          </select>
-        </div>
+
       </div>
     </div>
 
-    <!-- Exposure & Gain -->
-    <div class="section">
-      <div class="section-header">💡 Pozlama & Kazanç</div>
-      <div class="control-row">
-        <label>Pozlama Kontrolü</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="exposure_ctrl" onchange="setSetting('exposure_ctrl', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
+    <!-- Footer actions -->
+    <footer class="px-4 py-3 border-t border-[#3a3a3c] bg-[#1c1c1e] flex items-center justify-between gap-3 flex-shrink-0">
+      <div class="flex gap-2">
+        <button onclick="syncFromCamera()"
+          class="px-4 py-2.5 rounded-lg bg-[#3a3a3c] text-white text-xs font-semibold hover:bg-[#4a4a4c] transition-colors flex items-center gap-1.5 min-h-[44px]">
+          <span class="material-symbols-outlined text-base">sync</span>
+          Sync from Camera
+        </button>
+        <button onclick="resetDefaults()"
+          class="px-4 py-2.5 rounded-lg border border-[#3a3a3c] text-[#aeaeb2] text-xs font-semibold hover:bg-[#2c2c2e] transition-colors min-h-[44px]">
+          Reset Defaults
+        </button>
       </div>
-      <div class="control-row">
-        <label>AEC2</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="aec2" onchange="setSetting('aec2', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>AE Seviyesi</label>
-        <div class="input-wrap">
-          <input type="range" id="ae_level" min="-2" max="2" oninput="updateVal('ae_level');setSetting('ae_level',+this.value)">
-          <span class="val-display" id="ae_level-val">0</span>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>AEC Değeri</label>
-        <div class="input-wrap">
-          <input type="range" id="aec_value" min="0" max="1200" oninput="updateVal('aec_value');setSetting('aec_value',+this.value)">
-          <span class="val-display" id="aec_value-val">300</span>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>Kazanç Kontrolü</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="gain_ctrl" onchange="setSetting('gain_ctrl', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>AGC Kazancı</label>
-        <div class="input-wrap">
-          <input type="range" id="agc_gain" min="0" max="30" oninput="updateVal('agc_gain');setSetting('agc_gain',+this.value)">
-          <span class="val-display" id="agc_gain-val">0</span>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>Kazanç Tavanı</label>
-        <div class="input-wrap">
-          <select id="gainceiling" onchange="setSetting('gainceiling', +this.value)">
-            <option value="0">2x</option><option value="1">4x</option><option value="2">8x</option>
-            <option value="3">16x</option><option value="4">32x</option><option value="5">64x</option><option value="6">128x</option>
-          </select>
-        </div>
-      </div>
-    </div>
+      <button onclick="applyAll()"
+        class="px-6 py-2.5 rounded-lg bg-[#30d158] text-black text-xs font-bold hover:bg-[#28b34a] transition-all active:scale-95 shadow-lg shadow-[#30d158]/10 min-h-[44px]">
+        Apply All
+      </button>
+    </footer>
+  </section>
 
-    <!-- Advanced -->
-    <div class="section">
-      <div class="section-header">🔧 Gelişmiş</div>
-      <div class="control-row">
-        <label>BPC (Siyah Piksel)</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="bpc" onchange="setSetting('bpc', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>WPC (Beyaz Piksel)</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="wpc" onchange="setSetting('wpc', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>Raw GMA</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="raw_gma" onchange="setSetting('raw_gma', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>LENC (Lens Düzeltme)</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="lenc" onchange="setSetting('lenc', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>Yatay Ayna</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="hmirror" onchange="setSetting('hmirror', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>Dikey Çevirme</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="vflip" onchange="setSetting('vflip', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>DCW</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="dcw" onchange="setSetting('dcw', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-      <div class="control-row">
-        <label>Renk Çubuğu (Test)</label>
-        <div class="input-wrap">
-          <label class="toggle"><input type="checkbox" id="colorbar" onchange="setSetting('colorbar', this.checked?1:0)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+</main>
 
 <div id="toast"></div>
 
 <script>
-const TOGGLES = ['whitebal','awb_gain','exposure_ctrl','aec2','gain_ctrl','bpc','wpc','raw_gma','lenc','hmirror','vflip','dcw','colorbar'];
+const DEFAULTS = {framesize:5,quality:12,brightness:0,contrast:0,saturation:0,sharpness:0,denoise:0,special_effect:0,whitebal:1,awb_gain:1,wb_mode:0,exposure_ctrl:1,aec2:0,ae_level:0,aec_value:300,gain_ctrl:1,agc_gain:0,gainceiling:0,bpc:0,wpc:1,raw_gma:1,lenc:1,hmirror:1,vflip:1,dcw:1,colorbar:0};
 
-function updateVal(id) {
+function syncVal(id) {
   const el = document.getElementById(id);
-  const disp = document.getElementById(id + '-val');
-  if (disp && el) disp.textContent = el.value;
+  const sp = document.getElementById(id + '-val');
+  if (el && sp) sp.textContent = el.value;
 }
 
 function setControls(s) {
   for (const [k, v] of Object.entries(s)) {
     const el = document.getElementById(k);
     if (!el) continue;
-    if (el.type === 'checkbox') { el.checked = !!v; }
-    else { el.value = v; updateVal(k); }
+    if (el.type === 'checkbox') el.checked = Boolean(v);
+    else { el.value = v; syncVal(k); }
   }
-  const espEl = document.getElementById('esp-status');
-  espEl.textContent = s.esp32_connected ? '🟢 ESP32 bağlı' : '🔴 ESP32 bağlı değil';
+  const connected = s.esp32_connected;
+  document.getElementById('esp-dot').className = 'w-2 h-2 rounded-full ' + (connected ? 'bg-[#30d158]' : 'bg-[#3a3a3c]');
+  document.getElementById('esp-label').textContent = connected ? 'ESP32: Online' : 'ESP32: Offline';
 }
 
 let toastTimer;
@@ -862,7 +951,7 @@ function showToast(msg, ok) {
   t.textContent = msg;
   t.className = 'show ' + (ok ? 'ok' : 'err');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.className = '', 2500);
+  toastTimer = setTimeout(() => { t.className = ''; }, 2500);
 }
 
 async function setSetting(key, value) {
@@ -873,51 +962,45 @@ async function setSetting(key, value) {
       body: JSON.stringify({key, value})
     });
     if (r.ok) showToast(key + ' = ' + value, true);
-    else showToast('Hata: ' + key, false);
-  } catch(e) { showToast('Bağlantı hatası', false); }
+    else { const d = await r.json(); showToast(d.detail || 'Error', false); }
+  } catch(e) { showToast('Connection error', false); }
 }
 
 async function applyAll() {
   try {
-    const r = await fetch('/api/camera/apply_all', {method:'POST'});
+    const r = await fetch('/api/camera/apply_all', {method: 'POST'});
     const d = await r.json();
-    if (r.ok) {
-      if (d.note === 'push_mode') {
-        showToast('⚠️ Ayarlar kaydedildi (WebSocket yok, push modu)', true);
-      } else {
-        showToast('✅ ' + d.applied + ' ayar uygulandı', true);
-      }
-    } else {
-      showToast(d.detail || 'Hata', false);
-    }
-  } catch(e) { showToast('Bağlantı hatası', false); }
+    if (r.ok) showToast(d.applied > 0 ? (d.applied + ' settings applied') : 'Saved (push mode)', true);
+    else showToast(d.detail || 'Error', false);
+  } catch(e) { showToast('Connection error', false); }
 }
 
-async function getFromEsp() {
+async function syncFromCamera() {
   try {
-    const r = await fetch('/api/camera/get_from_esp', {method:'POST'});
+    const r = await fetch('/api/camera/get_from_esp', {method: 'POST'});
     const d = await r.json();
-    if (r.ok) { setControls(d); showToast("✅ ESP32'den alındı", true); }
-    else showToast(d.detail || 'Hata', false);
-  } catch(e) { showToast('Bağlantı hatası', false); }
+    if (r.ok) { setControls(d); showToast('Synced from ESP32', true); }
+    else showToast(d.detail || 'Error', false);
+  } catch(e) { showToast('Connection error', false); }
 }
 
 async function resetDefaults() {
-  const defaults = {framesize:5,quality:12,brightness:0,contrast:0,saturation:0,sharpness:0,denoise:0,special_effect:0,whitebal:1,awb_gain:1,wb_mode:0,exposure_ctrl:1,aec2:0,ae_level:0,aec_value:300,gain_ctrl:1,agc_gain:0,gainceiling:0,bpc:0,wpc:1,raw_gma:1,lenc:1,hmirror:1,vflip:1,dcw:1,colorbar:0};
-  setControls(defaults);
-  for (const [k, v] of Object.entries(defaults)) await setSetting(k, v);
+  setControls(DEFAULTS);
+  for (const [k, v] of Object.entries(DEFAULTS)) {
+    await setSetting(k, v);
+  }
 }
 
 function applyPreset(name) {
   const presets = {
     hq:   {framesize:10, quality:8},
-    hfps: {framesize:8, quality:20},
+    hfps: {framesize:8,  quality:20},
     night:{brightness:2, contrast:1, saturation:-1, exposure_ctrl:1, aec2:1}
   };
   const p = presets[name];
   for (const [k, v] of Object.entries(p)) {
     const el = document.getElementById(k);
-    if (el) { el.type === 'checkbox' ? (el.checked = !!v) : (el.value = v); updateVal(k); }
+    if (el) { el.type === 'checkbox' ? (el.checked = Boolean(v)) : (el.value = v); syncVal(k); }
     setSetting(k, v);
   }
 }
@@ -926,13 +1009,14 @@ async function pollHealth() {
   try {
     const r = await fetch('/health');
     const d = await r.json();
-    document.getElementById('fps-display').textContent = 'FPS: ' + d.fps;
-    document.getElementById('conn-display').textContent = d.fps > 0 ? '🟢 Canlı' : '🔴 Sinyal yok';
-    document.getElementById('esp-status').textContent = d.esp32_connected ? '🟢 ESP32 bağlı' : '🔴 ESP32 bağlı değil';
+    document.getElementById('fps-badge').textContent = d.fps + ' FPS';
+    const live = d.fps > 0;
+    document.getElementById('live-dot').className = 'w-2 h-2 rounded-full ' + (live ? 'bg-[#30d158] animate-pulse' : 'bg-[#3a3a3c]');
+    document.getElementById('esp-dot').className = 'w-2 h-2 rounded-full ' + (d.esp32_connected ? 'bg-[#30d158]' : 'bg-[#3a3a3c]');
+    document.getElementById('esp-label').textContent = d.esp32_connected ? 'ESP32: Online' : 'ESP32: Offline';
   } catch(e) {}
 }
 
-// Init
 (async () => {
   try {
     const r = await fetch('/api/camera/settings');
