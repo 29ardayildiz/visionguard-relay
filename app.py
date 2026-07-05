@@ -997,18 +997,24 @@ async function resetDefaults() {
   }
 }
 
-function applyPreset(name) {
+async function applyPreset(name) {
   const presets = {
     hq:   {framesize:10, quality:8},
     hfps: {framesize:8,  quality:20},
-    night:{brightness:2, contrast:1, saturation:-1, exposure_ctrl:1, aec2:1}
+    night:{brightness:2, contrast:1, saturation:-1, exposure_ctrl:1, aec2:1, ae_level:2, gain_ctrl:1, agc_gain:20}
   };
   const p = presets[name];
   for (const [k, v] of Object.entries(p)) {
     const el = document.getElementById(k);
-    if (el) { el.type === 'checkbox' ? (el.checked = Boolean(v)) : (el.value = v); syncVal(k); }
-    setSetting(k, v);
+    if (el) {
+      if (el.type === 'checkbox') { el.checked = Boolean(v); }
+      else if (el.tagName === 'SELECT') { el.value = v.toString(); }
+      else { el.value = v; el.dispatchEvent(new Event('input')); }
+    }
+    await setSetting(k, v);
   }
+  await fetch('/api/camera/apply_all', {method: 'POST'});
+  showToast('Preset applied', true);
 }
 
 async function pollHealth() {
