@@ -999,7 +999,7 @@ async function resetDefaults() {
 
 async function applyPreset(name) {
   const presets = {
-    hq:   {framesize:9, quality:10, brightness:0, contrast:0, saturation:0, sharpness:0, denoise:0, exposure_ctrl:1, aec2:0, gain_ctrl:1, agc_gain:0},
+    hq:   {framesize:9, quality:10, brightness:0, contrast:1, saturation:1, sharpness:1, denoise:10, whitebal:1, awb_gain:1, wb_mode:0, exposure_ctrl:1, aec2:1, ae_level:0, gain_ctrl:1, agc_gain:0, gainceiling:2, bpc:1, wpc:1, raw_gma:1, lenc:1, dcw:1},
     hfps: {framesize:5, quality:30, brightness:0, contrast:0, saturation:0, sharpness:0, denoise:0, exposure_ctrl:1, aec2:0, gain_ctrl:1, agc_gain:0},
     night:{framesize:5, quality:20, brightness:2, contrast:1, saturation:-1, sharpness:0, denoise:128, exposure_ctrl:1, aec2:1, ae_level:2, gain_ctrl:1, agc_gain:20, gainceiling:4}
   };
