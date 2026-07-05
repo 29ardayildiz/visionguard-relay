@@ -937,8 +937,14 @@ function setControls(s) {
   for (const [k, v] of Object.entries(s)) {
     const el = document.getElementById(k);
     if (!el) continue;
-    if (el.type === 'checkbox') el.checked = Boolean(v);
-    else { el.value = v; syncVal(k); }
+    if (el.type === 'checkbox') {
+      el.checked = Boolean(v);
+    } else if (el.tagName === 'SELECT') {
+      el.value = v.toString();
+    } else {
+      el.value = v;
+      el.dispatchEvent(new Event('input'));
+    }
   }
   const connected = s.esp32_connected;
   document.getElementById('esp-dot').className = 'w-2 h-2 rounded-full ' + (connected ? 'bg-[#30d158]' : 'bg-[#3a3a3c]');
