@@ -751,12 +751,12 @@ ADMIN_HTML = """<!DOCTYPE html>
 
             <div class="flex items-center justify-between min-h-[44px]">
               <span class="text-xs text-[#aeaeb2]">White Balance</span>
-              <div><input type="checkbox" id="whitebal" class="ios-toggle" onchange="setSetting('whitebal', this.checked?1:0)"><label for="whitebal" class="ios-toggle-label"></label></div>
+              <div><input type="checkbox" id="whitebal" class="sr-only ios-toggle" onchange="setSetting('whitebal', this.checked?1:0)"><label for="whitebal" class="ios-toggle-label"></label></div>
             </div>
 
             <div class="flex items-center justify-between min-h-[44px]">
               <span class="text-xs text-[#aeaeb2]">AWB Gain</span>
-              <div><input type="checkbox" id="awb_gain" class="ios-toggle" onchange="setSetting('awb_gain', this.checked?1:0)"><label for="awb_gain" class="ios-toggle-label"></label></div>
+              <div><input type="checkbox" id="awb_gain" class="sr-only ios-toggle" onchange="setSetting('awb_gain', this.checked?1:0)"><label for="awb_gain" class="ios-toggle-label"></label></div>
             </div>
 
             <div class="flex items-center gap-4 md:col-span-2">
@@ -785,11 +785,11 @@ ADMIN_HTML = """<!DOCTYPE html>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="flex items-center justify-between min-h-[44px]">
                 <span class="text-xs text-[#aeaeb2]">Exposure Control</span>
-                <div><input type="checkbox" id="exposure_ctrl" class="ios-toggle" onchange="setSetting('exposure_ctrl', this.checked?1:0)"><label for="exposure_ctrl" class="ios-toggle-label"></label></div>
+                <div><input type="checkbox" id="exposure_ctrl" class="sr-only ios-toggle" onchange="setSetting('exposure_ctrl', this.checked?1:0)"><label for="exposure_ctrl" class="ios-toggle-label"></label></div>
               </div>
               <div class="flex items-center justify-between min-h-[44px]">
                 <span class="text-xs text-[#aeaeb2]">AEC2</span>
-                <div><input type="checkbox" id="aec2" class="ios-toggle" onchange="setSetting('aec2', this.checked?1:0)"><label for="aec2" class="ios-toggle-label"></label></div>
+                <div><input type="checkbox" id="aec2" class="sr-only ios-toggle" onchange="setSetting('aec2', this.checked?1:0)"><label for="aec2" class="ios-toggle-label"></label></div>
               </div>
             </div>
 
@@ -816,7 +816,7 @@ ADMIN_HTML = """<!DOCTYPE html>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="flex items-center justify-between min-h-[44px]">
                 <span class="text-xs text-[#aeaeb2]">Gain Control</span>
-                <div><input type="checkbox" id="gain_ctrl" class="ios-toggle" onchange="setSetting('gain_ctrl', this.checked?1:0)"><label for="gain_ctrl" class="ios-toggle-label"></label></div>
+                <div><input type="checkbox" id="gain_ctrl" class="sr-only ios-toggle" onchange="setSetting('gain_ctrl', this.checked?1:0)"><label for="gain_ctrl" class="ios-toggle-label"></label></div>
               </div>
             </div>
 
@@ -856,42 +856,42 @@ ADMIN_HTML = """<!DOCTYPE html>
 
             <div class="flex items-center justify-between min-h-[44px]">
               <span class="text-xs text-[#aeaeb2]">BPC</span>
-              <div><input type="checkbox" id="bpc" class="ios-toggle" onchange="setSetting('bpc', this.checked?1:0)"><label for="bpc" class="ios-toggle-label"></label></div>
+              <div><input type="checkbox" id="bpc" class="sr-only ios-toggle" onchange="setSetting('bpc', this.checked?1:0)"><label for="bpc" class="ios-toggle-label"></label></div>
             </div>
 
             <div class="flex items-center justify-between min-h-[44px]">
               <span class="text-xs text-[#aeaeb2]">WPC</span>
-              <div><input type="checkbox" id="wpc" class="ios-toggle" onchange="setSetting('wpc', this.checked?1:0)"><label for="wpc" class="ios-toggle-label"></label></div>
+              <div><input type="checkbox" id="wpc" class="sr-only ios-toggle" onchange="setSetting('wpc', this.checked?1:0)"><label for="wpc" class="ios-toggle-label"></label></div>
             </div>
 
             <div class="flex items-center justify-between min-h-[44px]">
               <span class="text-xs text-[#aeaeb2]">Raw GMA</span>
-              <div><input type="checkbox" id="raw_gma" class="ios-toggle" onchange="setSetting('raw_gma', this.checked?1:0)"><label for="raw_gma" class="ios-toggle-label"></label></div>
+              <div><input type="checkbox" id="raw_gma" class="sr-only ios-toggle" onchange="setSetting('raw_gma', this.checked?1:0)"><label for="raw_gma" class="ios-toggle-label"></label></div>
             </div>
 
             <div class="flex items-center justify-between min-h-[44px]">
               <span class="text-xs text-[#aeaeb2]">LENC</span>
-              <div><input type="checkbox" id="lenc" class="ios-toggle" onchange="setSetting('lenc', this.checked?1:0)"><label for="lenc" class="ios-toggle-label"></label></div>
+              <div><input type="checkbox" id="lenc" class="sr-only ios-toggle" onchange="setSetting('lenc', this.checked?1:0)"><label for="lenc" class="ios-toggle-label"></label></div>
             </div>
 
             <div class="flex items-center justify-between min-h-[44px]">
               <span class="text-xs text-[#aeaeb2]">H-Mirror</span>
-              <div><input type="checkbox" id="hmirror" class="ios-toggle" onchange="setSetting('hmirror', this.checked?1:0)"><label for="hmirror" class="ios-toggle-label"></label></div>
+              <div><input type="checkbox" id="hmirror" class="sr-only ios-toggle" onchange="setSetting('hmirror', this.checked?1:0)"><label for="hmirror" class="ios-toggle-label"></label></div>
             </div>
 
             <div class="flex items-center justify-between min-h-[44px]">
               <span class="text-xs text-[#aeaeb2]">V-Flip</span>
-              <div><input type="checkbox" id="vflip" class="ios-toggle" onchange="setSetting('vflip', this.checked?1:0)"><label for="vflip" class="ios-toggle-label"></label></div>
+              <div><input type="checkbox" id="vflip" class="sr-only ios-toggle" onchange="setSetting('vflip', this.checked?1:0)"><label for="vflip" class="ios-toggle-label"></label></div>
             </div>
 
             <div class="flex items-center justify-between min-h-[44px]">
               <span class="text-xs text-[#aeaeb2]">DCW</span>
-              <div><input type="checkbox" id="dcw" class="ios-toggle" onchange="setSetting('dcw', this.checked?1:0)"><label for="dcw" class="ios-toggle-label"></label></div>
+              <div><input type="checkbox" id="dcw" class="sr-only ios-toggle" onchange="setSetting('dcw', this.checked?1:0)"><label for="dcw" class="ios-toggle-label"></label></div>
             </div>
 
             <div class="flex items-center justify-between min-h-[44px]">
               <span class="text-xs text-[#aeaeb2]">Colorbar</span>
-              <div><input type="checkbox" id="colorbar" class="ios-toggle" onchange="setSetting('colorbar', this.checked?1:0)"><label for="colorbar" class="ios-toggle-label"></label></div>
+              <div><input type="checkbox" id="colorbar" class="sr-only ios-toggle" onchange="setSetting('colorbar', this.checked?1:0)"><label for="colorbar" class="ios-toggle-label"></label></div>
             </div>
 
           </div>
