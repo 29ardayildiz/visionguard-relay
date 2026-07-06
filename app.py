@@ -9,14 +9,12 @@ import asyncio
 import io
 import json
 import os
-import shutil
 import time
 from collections import deque
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import Cookie, Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile, WebSocket, WebSocketDisconnect, status
+from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -77,13 +75,6 @@ camera_settings: dict = {
 }
 
 CAMERA_DEFAULTS = dict(camera_settings)
-
-# ── OTA storage ───────────────────────────────────────────────────────────────
-OTA_DIR = Path("/tmp/ota")
-OTA_DIR.mkdir(exist_ok=True)
-current_firmware_version = "1.0.0"
-pending_firmware_version: str | None = None
-firmware_available = False
 
 esp32_websocket: WebSocket | None = None
 esp32_settings_event = asyncio.Event()
@@ -907,53 +898,6 @@ ADMIN_HTML = """<!DOCTYPE html>
           </div>
         </div>
 
-        <!-- OTA Firmware Update Card -->
-        <div class="bg-[#2c2c2e] rounded-xl border border-[#3a3a3c] overflow-hidden">
-          <div class="px-4 py-2.5 border-b border-[#3a3a3c] bg-[#343436]/30 flex items-center gap-2">
-            <span class="material-symbols-outlined text-[#30d158] text-base">system_update</span>
-            <h3 class="text-sm font-semibold text-white">Firmware Update (OTA)</h3>
-          </div>
-          <div class="p-4 space-y-4">
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-[#aeaeb2]">Mevcut versiyon</span>
-              <span id="ota-current" class="font-mono text-[#30d158]">--</span>
-            </div>
-            <div id="ota-pending-row" class="hidden flex items-center justify-between text-xs">
-              <span class="text-[#aeaeb2]">Bekleyen güncelleme</span>
-              <span id="ota-pending" class="font-mono text-[#f59e0b]">--</span>
-            </div>
-            <hr class="border-[#3a3a3c]"/>
-            <div class="space-y-3">
-              <div class="flex items-center gap-3">
-                <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">Versiyon</label>
-                <input type="text" id="fw-version" placeholder="1.0.1"
-                  class="flex-1 bg-[#1c1c1e] border border-[#3a3a3c] text-white text-xs rounded-lg px-3 py-2.5 outline-none focus:border-[#30d158] transition-colors min-h-[44px]">
-              </div>
-              <div class="flex items-center gap-3">
-                <label class="text-xs text-[#aeaeb2] w-28 flex-shrink-0">Firmware (.bin)</label>
-                <input type="file" id="fw-file" accept=".bin"
-                  class="flex-1 text-xs text-[#aeaeb2] file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#3a3a3c] file:text-white hover:file:bg-[#4a4a4c] file:cursor-pointer min-h-[44px]">
-              </div>
-            </div>
-            <div id="fw-progress-wrap" class="hidden">
-              <div class="w-full bg-[#3a3a3c] rounded-full h-1.5">
-                <div id="fw-progress-bar" class="bg-[#30d158] h-1.5 rounded-full transition-all" style="width:0%"></div>
-              </div>
-            </div>
-            <p id="fw-status" class="text-xs text-[#636366]">Bekleyen güncelleme yok</p>
-            <div class="flex gap-2">
-              <button onclick="uploadFirmware()"
-                class="flex-1 px-4 py-2.5 rounded-lg bg-[#30d158] text-black text-xs font-bold hover:bg-[#28b34a] transition-all active:scale-95 min-h-[44px]">
-                Yükle
-              </button>
-              <button onclick="clearFirmware()"
-                class="px-4 py-2.5 rounded-lg border border-[#3a3a3c] text-[#aeaeb2] text-xs font-semibold hover:bg-[#3a3a3c] transition-colors min-h-[44px]">
-                Temizle
-              </button>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
 
@@ -1095,133 +1039,9 @@ async function pollHealth() {
 })();
 setInterval(pollHealth, 3000);
 pollHealth();
-
-async function loadOtaStatus() {
-  try {
-    const r = await fetch('/ota/status');
-    const d = await r.json();
-    document.getElementById('ota-current').textContent = 'v' + d.current_version;
-    if (d.firmware_available && d.pending_version) {
-      document.getElementById('ota-pending').textContent = 'v' + d.pending_version;
-      document.getElementById('ota-pending-row').classList.remove('hidden');
-      document.getElementById('fw-status').textContent = 'Bekleyen güncelleme: v' + d.pending_version;
-    } else {
-      document.getElementById('ota-pending-row').classList.add('hidden');
-      document.getElementById('fw-status').textContent = 'Bekleyen güncelleme yok';
-    }
-  } catch(e) {}
-}
-
-async function uploadFirmware() {
-  const file = document.getElementById('fw-file').files[0];
-  const version = document.getElementById('fw-version').value.trim();
-  if (!file || !version) { showToast('Dosya ve versiyon gerekli', false); return; }
-
-  document.getElementById('fw-status').textContent = 'Yükleniyor...';
-  document.getElementById('fw-progress-wrap').classList.remove('hidden');
-  document.getElementById('fw-progress-bar').style.width = '30%';
-
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('version', version);
-
-  try {
-    const r = await fetch('/ota/upload', {method: 'POST', body: formData});
-    const d = await r.json();
-    document.getElementById('fw-progress-bar').style.width = '100%';
-    if (r.ok) {
-      showToast('✅ Firmware yüklendi: v' + d.version, true);
-      document.getElementById('fw-status').textContent = 'Bekleyen güncelleme: v' + d.version + ' (' + d.size + ' bytes)';
-      document.getElementById('ota-pending').textContent = 'v' + d.version;
-      document.getElementById('ota-pending-row').classList.remove('hidden');
-    } else {
-      showToast('❌ Yükleme başarısız', false);
-      document.getElementById('fw-status').textContent = 'Yükleme başarısız';
-      document.getElementById('fw-progress-bar').style.width = '0%';
-    }
-  } catch(e) {
-    showToast('❌ Bağlantı hatası', false);
-    document.getElementById('fw-progress-bar').style.width = '0%';
-  }
-}
-
-async function clearFirmware() {
-  try {
-    const r = await fetch('/ota/clear', {method: 'POST'});
-    if (r.ok) {
-      showToast('Firmware temizlendi', true);
-      document.getElementById('fw-progress-bar').style.width = '0%';
-      document.getElementById('fw-progress-wrap').classList.add('hidden');
-      loadOtaStatus();
-    }
-  } catch(e) { showToast('Bağlantı hatası', false); }
-}
-
-loadOtaStatus();
 </script>
 </body>
 </html>"""
-
-
-# ── OTA endpoints ─────────────────────────────────────────────────────────────
-@app.post("/ota/upload")
-async def ota_upload(
-    _: str = Depends(get_current_user),
-    file: UploadFile = File(...),
-    version: str = Form(...),
-):
-    global pending_firmware_version, firmware_available
-    dest = OTA_DIR / "firmware.bin"
-    with dest.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
-    pending_firmware_version = version
-    firmware_available = True
-    return {"status": "ok", "version": version, "size": dest.stat().st_size}
-
-
-@app.get("/ota/check")
-async def ota_check(request: Request):
-    if request.headers.get("X-Secret-Key") != SECRET_KEY:
-        return Response("Unauthorized", status_code=401)
-    return {
-        "update_available": firmware_available,
-        "version": pending_firmware_version or current_firmware_version,
-        "url": str(request.base_url) + "ota/firmware.bin",
-    }
-
-
-@app.get("/ota/firmware.bin")
-async def ota_firmware(request: Request):
-    if request.headers.get("X-Secret-Key") != SECRET_KEY:
-        return Response("Unauthorized", status_code=401)
-    dest = OTA_DIR / "firmware.bin"
-    if not dest.exists():
-        raise HTTPException(status_code=404, detail="No firmware available")
-    return StreamingResponse(
-        dest.open("rb"),
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": "attachment; filename=firmware.bin"},
-    )
-
-
-@app.post("/ota/clear")
-async def ota_clear(_: str = Depends(get_current_user)):
-    global pending_firmware_version, firmware_available
-    dest = OTA_DIR / "firmware.bin"
-    if dest.exists():
-        dest.unlink()
-    pending_firmware_version = None
-    firmware_available = False
-    return {"status": "ok"}
-
-
-@app.get("/ota/status")
-async def ota_status(_: str = Depends(get_current_user)):
-    return {
-        "firmware_available": firmware_available,
-        "pending_version": pending_firmware_version,
-        "current_version": current_firmware_version,
-    }
 
 
 @app.get("/admin", response_class=HTMLResponse)
