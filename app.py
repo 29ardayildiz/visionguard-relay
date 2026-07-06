@@ -618,10 +618,11 @@ ADMIN_HTML = """<!DOCTYPE html>
     <!-- Presets -->
     <div class="px-4 pb-4 space-y-2">
       <p class="text-[10px] font-semibold text-[#636366] uppercase tracking-widest">Quick Presets</p>
-      <div class="grid grid-cols-3 gap-2 p-1 bg-[#2c2c2e] rounded-xl border border-[#3a3a3c]">
+      <div class="grid grid-cols-2 gap-2 p-1 bg-[#2c2c2e] rounded-xl border border-[#3a3a3c]">
         <button onclick="applyPreset('hq')" class="text-white py-2.5 rounded-lg text-xs font-semibold hover:bg-[#3a3a3c] transition-all active:scale-95">🎯 High Quality</button>
         <button onclick="applyPreset('hfps')" class="text-[#aeaeb2] py-2.5 rounded-lg text-xs font-semibold hover:bg-[#3a3a3c] transition-all active:scale-95">⚡ High FPS (~20fps)</button>
         <button onclick="applyPreset('night')" class="text-[#aeaeb2] py-2.5 rounded-lg text-xs font-semibold hover:bg-[#3a3a3c] transition-all active:scale-95">🌙 Night Mode</button>
+        <button onclick="applyPreset('fixed_light')" class="text-[#aeaeb2] py-2.5 rounded-lg text-xs font-semibold hover:bg-[#3a3a3c] transition-all active:scale-95">💡 Fixed Light</button>
       </div>
     </div>
   </section>
@@ -999,9 +1000,10 @@ async function resetDefaults() {
 
 async function applyPreset(name) {
   const presets = {
-    hq:   {framesize:9, quality:10, brightness:0, contrast:1, saturation:1, sharpness:1, denoise:10, whitebal:1, awb_gain:1, wb_mode:0, exposure_ctrl:1, aec2:1, ae_level:0, gain_ctrl:1, agc_gain:0, gainceiling:2, bpc:1, wpc:1, raw_gma:1, lenc:1, dcw:1},
-    hfps: {framesize:5, quality:30, brightness:0, contrast:0, saturation:0, sharpness:0, denoise:0, exposure_ctrl:1, aec2:0, gain_ctrl:1, agc_gain:0},
-    night:{framesize:5, quality:20, brightness:2, contrast:1, saturation:-1, sharpness:0, denoise:128, exposure_ctrl:1, aec2:1, ae_level:2, gain_ctrl:1, agc_gain:20, gainceiling:4}
+    hq:   {framesize:9, quality:10, brightness:0, contrast:1, saturation:1, sharpness:1, denoise:10, whitebal:1, awb_gain:1, wb_mode:0, exposure_ctrl:1, aec2:1, ae_level:0, gain_ctrl:1, agc_gain:0, gainceiling:2, bpc:1, wpc:1, raw_gma:1, lenc:1, hmirror:1, vflip:1, dcw:1},
+    hfps: {framesize:5, quality:30, brightness:0, contrast:0, saturation:0, sharpness:0, denoise:0, exposure_ctrl:1, aec2:0, gain_ctrl:1, agc_gain:0, hmirror:1, vflip:1},
+    night:{framesize:5, quality:20, brightness:2, contrast:1, saturation:-1, sharpness:0, denoise:128, exposure_ctrl:1, aec2:1, ae_level:2, gain_ctrl:1, agc_gain:20, gainceiling:4, hmirror:1, vflip:1},
+    fixed_light:{framesize:10, quality:12, brightness:0, contrast:1, saturation:1, sharpness:1, denoise:10, whitebal:1, awb_gain:0, wb_mode:1, exposure_ctrl:0, aec2:0, ae_level:0, aec_value:300, gain_ctrl:0, agc_gain:5, gainceiling:0, bpc:1, wpc:1, raw_gma:1, lenc:1, hmirror:1, vflip:1, dcw:1, colorbar:0}
   };
   const p = presets[name];
   for (const [k, v] of Object.entries(p)) {
