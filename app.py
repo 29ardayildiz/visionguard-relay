@@ -16,7 +16,6 @@ from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -42,7 +41,6 @@ app = FastAPI()
 app.state.limiter = limiter
 
 templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ── Stream state ──────────────────────────────────────────────────────────────
 latest_frame: bytes | None = None
