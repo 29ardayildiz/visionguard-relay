@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VisionGuard">
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="/manifest.json">
+  <title>VisionGuard Remote</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #000;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #fff;
+    }
+    img { max-width: 100%; height: auto; display: block; }
+    #info { margin-top: 12px; font-size: 1rem; text-align: center; color: #ccc; }
+    #logout { position: fixed; top: 16px; right: 16px; color: #636366; font-size: 0.8rem; text-decoration: none; padding: 6px 12px; background: rgba(44,44,46,0.8); border-radius: 8px; backdrop-filter: blur(10px); }
+    #logout:hover { color: #fff; }
+    #admin-link { position: fixed; top: 16px; left: 16px; color: #636366; font-size: 0.8rem; text-decoration: none; padding: 6px 12px; background: rgba(44,44,46,0.8); border-radius: 8px; backdrop-filter: blur(10px); }
+    #admin-link:hover { color: #30d158; }
+  </style>
+</head>
+<body>
+  <img src="/stream" alt="Live feed">
+  <div id="info">
+    <div id="status">⏳ Bekleniyor...</div>
+    <div id="fps">FPS: --</div>
+  </div>
+  <a href="/admin" id="admin-link">⚙️ Admin</a>
+  <a href="/logout" id="logout">Çıkış</a>
+  <script>
+    async function apiFetch(url, opts) {
+      const r = await fetch(url, opts);
+      if (r.status === 401) { window.location.href = '/login'; return null; }
+      return r;
+    }
+    async function update() {
+      try {
+        const r = await apiFetch('/health');
+        if (!r) return;
+        const d = await r.json();
+        document.getElementById('fps').textContent = 'FPS: ' + d.fps;
+        document.getElementById('status').textContent = d.fps > 0 ? '🟢 Canlı' : '🔴 Bağlantı yok';
+      } catch(e) {
+        document.getElementById('status').textContent = '🔴 Bağlantı yok';
+      }
+    }
+    setInterval(update, 2000);
+    update();
+  </script>
+</body>
+</html>
