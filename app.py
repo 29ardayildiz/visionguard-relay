@@ -158,7 +158,7 @@ async def security_headers(request: Request, call_next):
 # ── Auth routes ───────────────────────────────────────────────────────────────
 @app.get("/login")
 async def login_page(request: Request, error: int = 0):
-    return templates.TemplateResponse("login.html", {"request": request, "error": error})
+    return templates.TemplateResponse(request, "login.html", {"error": error})
 
 
 @app.post("/login")
@@ -197,12 +197,12 @@ async def logout():
 # ── Page routes ───────────────────────────────────────────────────────────────
 @app.get("/")
 async def index(request: Request, _: str = Depends(get_current_user)):
-    return templates.TemplateResponse("viewer.html", {"request": request})
+    return templates.TemplateResponse(request, "viewer.html")
 
 
 @app.get("/admin")
 async def admin_panel(request: Request, _: str = Depends(get_current_user)):
-    return templates.TemplateResponse("admin.html", {"request": request})
+    return templates.TemplateResponse(request, "admin.html")
 
 
 # ── Stream endpoint ───────────────────────────────────────────────────────────
