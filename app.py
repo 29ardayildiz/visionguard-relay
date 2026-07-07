@@ -115,14 +115,28 @@ def verify_token(token: str) -> str:
 
 
 # ── Auth dependency ───────────────────────────────────────────────────────────
-async def get_current_user(token: str = Cookie(default=None)) -> str:
+async def get_current_user(request: Request, token: str = Cookie(default=None)) -> str:
+    def _is_browser() -> bool:
+        accept = request.headers.get("accept", "")
+        return "text/html" in accept
+
     if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"Location": "/login"},
-        )
-    return verify_token(token)
+        if _is_browser():
+            raise HTTPException(
+                status_code=status.HTTP_302_FOUND,
+                headers={"Location": "/login"},
+            )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    try:
+        return verify_token(token)
+    except HTTPException:
+        if _is_browser():
+            raise HTTPException(
+                status_code=status.HTTP_302_FOUND,
+                headers={"Location": "/login"},
+            )
+        raise
 
 
 # ── Security headers middleware ───────────────────────────────────────────────
@@ -315,9 +329,15 @@ VIEWER_HTML = """<!DOCTYPE html>
   <a href="/admin" id="admin-link">⚙️ Admin</a>
   <a href="/logout" id="logout">Çıkış</a>
   <script>
+    async function apiFetch(url, opts) {
+      const r = await fetch(url, opts);
+      if (r.status === 401) { window.location.href = '/login'; return null; }
+      return r;
+    }
     async function update() {
       try {
-        const r = await fetch('/health');
+        const r = await apiFetch('/health');
+        if (!r) return;
         const d = await r.json();
         document.getElementById('fps').textContent = 'FPS: ' + d.fps;
         document.getElementById('status').textContent = d.fps > 0 ? '🟢 Canlı' : '🔴 Bağlantı yok';
@@ -952,6 +972,12 @@ function setControls(s) {
   document.getElementById('esp-label').textContent = connected ? 'ESP32: Online' : 'ESP32: Offline';
 }
 
+async function apiFetch(url, opts) {
+  const r = await fetch(url, opts);
+  if (r.status === 401) { window.location.href = '/login'; return null; }
+  return r;
+}
+
 let toastTimer;
 function showToast(msg, ok) {
   const t = document.getElementById('toast');
@@ -963,11 +989,12 @@ function showToast(msg, ok) {
 
 async function setSetting(key, value) {
   try {
-    const r = await fetch('/api/camera/set', {
+    const r = await apiFetch('/api/camera/set', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({key, value})
     });
+    if (!r) return;
     if (r.ok) showToast(key + ' = ' + value, true);
     else { const d = await r.json(); showToast(d.detail || 'Error', false); }
   } catch(e) { showToast('Connection error', false); }
@@ -975,7 +1002,8 @@ async function setSetting(key, value) {
 
 async function applyAll() {
   try {
-    const r = await fetch('/api/camera/apply_all', {method: 'POST'});
+    const r = await apiFetch('/api/camera/apply_all', {method: 'POST'});
+    if (!r) return;
     const d = await r.json();
     if (r.ok) showToast(d.applied > 0 ? (d.applied + ' settings applied') : 'Saved (push mode)', true);
     else showToast(d.detail || 'Error', false);
@@ -984,7 +1012,8 @@ async function applyAll() {
 
 async function syncFromCamera() {
   try {
-    const r = await fetch('/api/camera/get_from_esp', {method: 'POST'});
+    const r = await apiFetch('/api/camera/get_from_esp', {method: 'POST'});
+    if (!r) return;
     const d = await r.json();
     if (r.ok) { setControls(d); showToast('Synced from ESP32', true); }
     else showToast(d.detail || 'Error', false);
@@ -1015,13 +1044,14 @@ async function applyPreset(name) {
     }
     await setSetting(k, v);
   }
-  await fetch('/api/camera/apply_all', {method: 'POST'});
+  await apiFetch('/api/camera/apply_all', {method: 'POST'});
   showToast('✅ Preset applied', true);
 }
 
 async function pollHealth() {
   try {
-    const r = await fetch('/health');
+    const r = await apiFetch('/health');
+    if (!r) return;
     const d = await r.json();
     document.getElementById('fps-badge').textContent = d.fps + ' FPS';
     const live = d.fps > 0;
@@ -1033,7 +1063,8 @@ async function pollHealth() {
 
 (async () => {
   try {
-    const r = await fetch('/api/camera/settings');
+    const r = await apiFetch('/api/camera/settings');
+    if (!r) return;
     setControls(await r.json());
   } catch(e) {}
 })();
