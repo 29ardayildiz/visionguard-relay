@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -11,6 +12,30 @@ export default defineConfig({
     vue(),
     vueDevTools(),
     tailwindcss(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg', 'favicon-32x32.png', 'apple-touch-icon.png'],
+      manifest: {
+        name: 'VisionGuard',
+        short_name: 'VisionGuard',
+        description: 'Garaj güvenlik kamerası — canlı izleme ve kamera kontrolü',
+        lang: 'tr',
+        start_url: '/',
+        display: 'standalone',
+        background_color: '#090a0a',
+        theme_color: '#090a0a',
+        icons: [
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      // Faz 8'de Lighthouse ile gözden geçirilecek; şimdilik tüm build
+      // çıktısı (app-shell) precache ediliyor — MASTER.md §12: "anında açılış".
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+      },
+    }),
   ],
   resolve: {
     alias: {
