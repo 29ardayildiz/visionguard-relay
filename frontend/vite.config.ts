@@ -17,4 +17,31 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // Sadece `npm run dev` içindir — backend (uvicorn) ve Vite dev server farklı
+  // origin/port'ta çalıştığı için /login, /api, /ws vb. istekler backend'e
+  // proxy'lenir. Production'da FastAPI tek origin'den serve ettiği için
+  // (Faz 7 — Cutover) bu proxy hiç devreye girmez.
+  server: {
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+      // /login çakışıyor: GET (sayfa yüklemesi) Vue Router'ın kendi rotası,
+      // POST (form submit) ise backend'in auth action'ı. Sadece POST'u
+      // proxy'liyoruz; GET bypass ile Vite'a (SPA fallback -> index.html)
+      // bırakılıyor, aksi halde Vue hiç mount olmadan eski Jinja2 login.html
+      // sessizce gösterilir.
+      '/login': {
+        target: 'http://127.0.0.1:8000',
+        bypass(req) {
+          if (req.method === 'GET') return req.url
+        },
+      },
+      '/logout': 'http://127.0.0.1:8000',
+      '/health': 'http://127.0.0.1:8000',
+      '/stream': 'http://127.0.0.1:8000',
+      '/push': 'http://127.0.0.1:8000',
+      '/ws': { target: 'ws://127.0.0.1:8000', ws: true },
+      '/manifest.json': 'http://127.0.0.1:8000',
+      '/icon.png': 'http://127.0.0.1:8000',
+    },
+  },
 })
