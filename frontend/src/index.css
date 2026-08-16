@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/* ── Emerald Guard renk token'ları (MASTER.md §9.1/§9.2) ─────────────────── */
+/* Tailwind v4 CSS-first config: her --color-* değişkeni otomatik olarak
+   bg-, text- ve border- utility'lerini üretir (ör. --color-brand -> bg-brand,
+   text-brand, border-brand). Opacity modifier'lar (bg-brand/10) herhangi bir
+   custom renkte native çalıştığı için ayrı bir "subtle" token'a gerek yok. */
+@theme {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif;
+
+  --color-guard-bg: #090a0a;
+  --color-guard-surface: #161817;
+  --color-guard-elevated: #222624;
+  --color-guard-border: #2d3330;
+  --color-guard-muted: #6b7280;
+  --color-guard-secondary: #9ca3af;
+  --color-guard-primary: #f3f4f6;
+
+  --color-brand: #10b981;
+  --color-brand-hover: #059669;
+  --color-brand-accent: #34d399;
+
+  --color-status-live: #10b981;
+  --color-status-waking: #f59e0b;
+  --color-status-offline: #ef4444;
+}
+
+/* ── Safe area (MASTER.md §8.2) ───────────────────────────────────────────── */
+:root {
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+  --sar: env(safe-area-inset-right);
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-guard-bg);
+  color: var(--color-guard-primary);
+  padding-top: var(--sat);
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+  overscroll-behavior-y: contain;
+}
+
+/* ── Anti-web polish (MASTER.md §8.1/§8.3, CLAUDE.md §4) ──────────────────── */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body,
+button,
+a,
+[role='button'] {
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* Değer panoları / hata logları gibi kasıtlı seçilebilir alanlar için */
+.selectable {
+  user-select: text;
+}
