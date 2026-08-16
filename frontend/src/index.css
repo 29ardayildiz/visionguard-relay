@@ -92,3 +92,32 @@ a,
 .animate-shake {
   animation: shake 0.4s ease-in-out;
 }
+
+/* ── Sunucu uyanıyor durumu — sakin, yavaş dönen HUD loader ───────────────── */
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 2.4s linear infinite;
+}
+
+/* ── Ekran geçişleri (MASTER.md §4: native push/pop hissi) ───────────────── */
+.page-enter-active,
+.page-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateX(12px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateX(-12px);
+}
