@@ -1,12 +1,354 @@
 <script setup lang="ts">
-// Faz 5'te 4 ayar kartı + presetler ile doldurulacak.
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+
+import AppIcon from '../components/AppIcon.vue'
+import SettingsCard from '../components/settings/SettingsCard.vue'
+import SelectControl from '../components/settings/SelectControl.vue'
+import SliderControl from '../components/settings/SliderControl.vue'
+import ToggleControl from '../components/settings/ToggleControl.vue'
+
+import cardAdvancedSvg from '../icons/cards/card-advanced.svg?raw'
+import cardExposureGainSvg from '../icons/cards/card-exposure-gain.svg?raw'
+import cardImagingSvg from '../icons/cards/card-imaging.svg?raw'
+import cardWhiteBalanceSvg from '../icons/cards/card-white-balance.svg?raw'
+import actionApplySvg from '../icons/actions/action-apply.svg?raw'
+import actionResetSvg from '../icons/actions/action-reset.svg?raw'
+import actionSyncSvg from '../icons/actions/action-sync.svg?raw'
+import presetFixedLightSvg from '../icons/presets/preset-fixed-light.svg?raw'
+import presetHighFpsSvg from '../icons/presets/preset-high-fps.svg?raw'
+import presetHighQualitySvg from '../icons/presets/preset-high-quality.svg?raw'
+import presetNightModeSvg from '../icons/presets/preset-night-mode.svg?raw'
+
+import { useAuthGuard } from '../lib/auth'
+import {
+  FRAMESIZE_OPTIONS,
+  GAINCEILING_OPTIONS,
+  SPECIAL_EFFECT_OPTIONS,
+  WB_MODE_OPTIONS,
+} from '../lib/cameraOptions'
+import { useConnectionStore } from '../stores/connection'
+import { useCameraStore, type CameraSettings } from '../stores/camera'
+import { useToastStore } from '../stores/toast'
+
+const router = useRouter()
+const guard = useAuthGuard()
+const connection = useConnectionStore()
+const camera = useCameraStore()
+const toast = useToastStore()
+
+const PRESETS = [
+  { key: 'hq', label: 'High Quality', icon: presetHighQualitySvg },
+  { key: 'hfps', label: 'High FPS', icon: presetHighFpsSvg },
+  { key: 'night', label: 'Night Mode', icon: presetNightModeSvg },
+  { key: 'fixed_light', label: 'Fixed Light', icon: presetFixedLightSvg },
+] as const
+
+onMounted(async () => {
+  if (await guard()) {
+    connection.start()
+    await camera.fetchSettings()
+  }
+})
+
+function vibrate(): void {
+  if ('vibrate' in navigator) navigator.vibrate(10)
+}
+
+function goViewer(): void {
+  router.push({ name: 'viewer' })
+}
+
+async function commitSetting<K extends keyof CameraSettings>(key: K, value: CameraSettings[K]): Promise<void> {
+  const ok = await camera.setSetting(key, value)
+  toast.show(ok ? `${key} = ${value}` : `${key} güncellenemedi`, ok ? 'ok' : 'err')
+}
+
+function toggleValue<K extends keyof CameraSettings>(key: K, checked: boolean): void {
+  void commitSetting(key, (checked ? 1 : 0) as CameraSettings[K])
+}
+
+async function onPreset(name: (typeof PRESETS)[number]['key']): Promise<void> {
+  vibrate()
+  await camera.applyPreset(name)
+  toast.show('Preset uygulandı', 'ok')
+}
+
+async function onSync(): Promise<void> {
+  vibrate()
+  const ok = await camera.syncFromCamera()
+  toast.show(ok ? "ESP32'den senkronize edildi" : 'ESP32 WebSocket bağlı değil (push modu)', ok ? 'ok' : 'err')
+}
+
+async function onReset(): Promise<void> {
+  vibrate()
+  await camera.resetDefaults()
+  toast.show('Varsayılanlara sıfırlandı', 'ok')
+}
+
+async function onApplyAll(): Promise<void> {
+  vibrate()
+  const applied = await camera.applyAll()
+  if (applied === null) {
+    toast.show('Uygulanamadı', 'err')
+  } else {
+    toast.show(applied > 0 ? `${applied} ayar uygulandı` : 'Kaydedildi (push modu)', 'ok')
+  }
+}
 </script>
 
 <template>
-  <main class="flex min-h-full items-center justify-center bg-guard-bg p-4">
-    <div class="rounded-2xl border border-guard-border bg-guard-surface p-8 text-guard-primary">
-      <h1 class="text-lg font-semibold">Admin</h1>
-      <p class="text-sm text-guard-secondary">Kamera ayar paneli — Faz 5'te doldurulacak</p>
+  <div class="min-h-full bg-guard-bg pb-24">
+    <!-- Üst bar -->
+    <header
+      class="sticky top-0 z-20 flex items-center justify-between border-b border-guard-border bg-guard-bg/90 px-4 py-3 backdrop-blur-md"
+      :style="{ paddingTop: 'calc(var(--sat) + 0.75rem)' }"
+    >
+      <button
+        type="button"
+        class="text-xs text-guard-secondary transition-colors hover:text-guard-primary"
+        @click="goViewer"
+      >
+        ‹ Canlı
+      </button>
+      <h1 class="text-sm font-semibold text-guard-primary">Kamera Ayarları</h1>
+      <div
+        class="flex items-center gap-1.5 rounded-full border border-guard-border bg-guard-surface px-3 py-1 text-[11px] text-guard-secondary"
+      >
+        <span
+          class="h-1.5 w-1.5 rounded-full"
+          :class="connection.esp32Connected ? 'bg-status-live' : 'bg-guard-border'"
+        />
+        ESP32: {{ connection.esp32Connected ? 'Online' : 'Offline' }}
+      </div>
+    </header>
+
+    <div class="mx-auto max-w-2xl space-y-4 p-4">
+      <!-- Quick Presets -->
+      <div class="grid grid-cols-2 gap-2 rounded-xl border border-guard-border bg-guard-surface p-1.5 sm:grid-cols-4">
+        <button
+          v-for="preset in PRESETS"
+          :key="preset.key"
+          type="button"
+          class="flex flex-col items-center gap-1.5 rounded-lg px-2 py-2.5 text-[11px] font-semibold text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95"
+          @click="onPreset(preset.key)"
+        >
+          <AppIcon :svg="preset.icon" class="h-5 w-5 text-brand-accent" />
+          {{ preset.label }}
+        </button>
+      </div>
+
+      <!-- Imaging Controls -->
+      <SettingsCard title="Imaging Controls" :icon="cardImagingSvg">
+        <SelectControl
+          label="Resolution"
+          :model-value="camera.settings.framesize"
+          :options="FRAMESIZE_OPTIONS"
+          @update:model-value="commitSetting('framesize', $event)"
+        />
+        <SliderControl
+          label="JPEG Quality"
+          :model-value="camera.settings.quality"
+          :min="4"
+          :max="63"
+          @update:model-value="camera.settings.quality = $event"
+          @commit="commitSetting('quality', $event)"
+        />
+        <SliderControl
+          label="Brightness"
+          :model-value="camera.settings.brightness"
+          :min="-2"
+          :max="2"
+          @update:model-value="camera.settings.brightness = $event"
+          @commit="commitSetting('brightness', $event)"
+        />
+        <SliderControl
+          label="Contrast"
+          :model-value="camera.settings.contrast"
+          :min="-2"
+          :max="2"
+          @update:model-value="camera.settings.contrast = $event"
+          @commit="commitSetting('contrast', $event)"
+        />
+        <SliderControl
+          label="Saturation"
+          :model-value="camera.settings.saturation"
+          :min="-2"
+          :max="2"
+          @update:model-value="camera.settings.saturation = $event"
+          @commit="commitSetting('saturation', $event)"
+        />
+        <SliderControl
+          label="Sharpness"
+          :model-value="camera.settings.sharpness"
+          :min="-2"
+          :max="2"
+          @update:model-value="camera.settings.sharpness = $event"
+          @commit="commitSetting('sharpness', $event)"
+        />
+        <SliderControl
+          label="Denoise"
+          :model-value="camera.settings.denoise"
+          :min="0"
+          :max="255"
+          @update:model-value="camera.settings.denoise = $event"
+          @commit="commitSetting('denoise', $event)"
+        />
+        <SelectControl
+          label="Special Effect"
+          :model-value="camera.settings.special_effect"
+          :options="SPECIAL_EFFECT_OPTIONS"
+          @update:model-value="commitSetting('special_effect', $event)"
+        />
+      </SettingsCard>
+
+      <!-- White Balance -->
+      <SettingsCard title="White Balance" :icon="cardWhiteBalanceSvg">
+        <ToggleControl
+          label="White Balance"
+          :model-value="Boolean(camera.settings.whitebal)"
+          @update:model-value="toggleValue('whitebal', $event)"
+        />
+        <ToggleControl
+          label="AWB Gain"
+          :model-value="Boolean(camera.settings.awb_gain)"
+          @update:model-value="toggleValue('awb_gain', $event)"
+        />
+        <SelectControl
+          label="WB Mode"
+          :model-value="camera.settings.wb_mode"
+          :options="WB_MODE_OPTIONS"
+          @update:model-value="commitSetting('wb_mode', $event)"
+        />
+      </SettingsCard>
+
+      <!-- Exposure & Gain -->
+      <SettingsCard title="Exposure &amp; Gain" :icon="cardExposureGainSvg">
+        <ToggleControl
+          label="Exposure Control"
+          :model-value="Boolean(camera.settings.exposure_ctrl)"
+          @update:model-value="toggleValue('exposure_ctrl', $event)"
+        />
+        <ToggleControl
+          label="AEC2"
+          :model-value="Boolean(camera.settings.aec2)"
+          @update:model-value="toggleValue('aec2', $event)"
+        />
+        <SliderControl
+          label="AE Level"
+          :model-value="camera.settings.ae_level"
+          :min="-2"
+          :max="2"
+          @update:model-value="camera.settings.ae_level = $event"
+          @commit="commitSetting('ae_level', $event)"
+        />
+        <SliderControl
+          label="AEC Value"
+          :model-value="camera.settings.aec_value"
+          :min="0"
+          :max="1200"
+          @update:model-value="camera.settings.aec_value = $event"
+          @commit="commitSetting('aec_value', $event)"
+        />
+        <ToggleControl
+          label="Gain Control"
+          :model-value="Boolean(camera.settings.gain_ctrl)"
+          @update:model-value="toggleValue('gain_ctrl', $event)"
+        />
+        <SliderControl
+          label="AGC Gain"
+          :model-value="camera.settings.agc_gain"
+          :min="0"
+          :max="30"
+          @update:model-value="camera.settings.agc_gain = $event"
+          @commit="commitSetting('agc_gain', $event)"
+        />
+        <SelectControl
+          label="Gain Ceiling"
+          :model-value="camera.settings.gainceiling"
+          :options="GAINCEILING_OPTIONS"
+          @update:model-value="commitSetting('gainceiling', $event)"
+        />
+      </SettingsCard>
+
+      <!-- Advanced -->
+      <SettingsCard title="Advanced" :icon="cardAdvancedSvg">
+        <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+          <ToggleControl
+            label="BPC"
+            :model-value="Boolean(camera.settings.bpc)"
+            @update:model-value="toggleValue('bpc', $event)"
+          />
+          <ToggleControl
+            label="WPC"
+            :model-value="Boolean(camera.settings.wpc)"
+            @update:model-value="toggleValue('wpc', $event)"
+          />
+          <ToggleControl
+            label="Raw GMA"
+            :model-value="Boolean(camera.settings.raw_gma)"
+            @update:model-value="toggleValue('raw_gma', $event)"
+          />
+          <ToggleControl
+            label="LENC"
+            :model-value="Boolean(camera.settings.lenc)"
+            @update:model-value="toggleValue('lenc', $event)"
+          />
+          <ToggleControl
+            label="H-Mirror"
+            :model-value="Boolean(camera.settings.hmirror)"
+            @update:model-value="toggleValue('hmirror', $event)"
+          />
+          <ToggleControl
+            label="V-Flip"
+            :model-value="Boolean(camera.settings.vflip)"
+            @update:model-value="toggleValue('vflip', $event)"
+          />
+          <ToggleControl
+            label="DCW"
+            :model-value="Boolean(camera.settings.dcw)"
+            @update:model-value="toggleValue('dcw', $event)"
+          />
+          <ToggleControl
+            label="Colorbar"
+            :model-value="Boolean(camera.settings.colorbar)"
+            @update:model-value="toggleValue('colorbar', $event)"
+          />
+        </div>
+      </SettingsCard>
     </div>
-  </main>
+
+    <!-- Alt sabit aksiyon barı -->
+    <footer
+      class="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-2 border-t border-guard-border bg-guard-bg/90 px-4 py-3 backdrop-blur-md"
+      :style="{ paddingBottom: 'calc(var(--sab) + 0.75rem)' }"
+    >
+      <div class="flex gap-2">
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-lg bg-guard-elevated px-4 py-2.5 text-xs font-semibold text-guard-primary transition-colors hover:bg-guard-border active:scale-95"
+          @click="onSync"
+        >
+          <AppIcon :svg="actionSyncSvg" class="h-4 w-4" />
+          Sync
+        </button>
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-lg border border-guard-border px-4 py-2.5 text-xs font-semibold text-guard-secondary transition-colors hover:bg-guard-surface active:scale-95"
+          @click="onReset"
+        >
+          <AppIcon :svg="actionResetSvg" class="h-4 w-4" />
+          Reset
+        </button>
+      </div>
+      <button
+        type="button"
+        class="flex items-center gap-1.5 rounded-lg bg-brand px-6 py-2.5 text-xs font-bold text-guard-bg shadow-lg shadow-brand/10 transition-all hover:bg-brand-hover active:scale-95"
+        @click="onApplyAll"
+      >
+        <AppIcon :svg="actionApplySvg" class="h-4 w-4" />
+        Apply All
+      </button>
+    </footer>
+  </div>
 </template>

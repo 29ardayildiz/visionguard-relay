@@ -121,3 +121,17 @@ a,
   opacity: 0;
   transform: translateX(-12px);
 }
+
+/* ── Toast bildirimleri ────────────────────────────────────────────────── */
+.toast-enter-active,
+.toast-leave-active {
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
