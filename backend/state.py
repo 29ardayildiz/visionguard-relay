@@ -47,6 +47,9 @@ esp32_settings_event = asyncio.Event()
 # ── Brute-force protection ────────────────────────────────────────────────────
 failed_attempts: dict[str, list[float]] = {}
 
+# ── Browser client channel (/ws/client) ───────────────────────────────────────
+browser_clients: set[WebSocket] = set()
+
 
 def is_esp32_connected() -> bool:
     if esp32_websocket is not None:
@@ -54,3 +57,14 @@ def is_esp32_connected() -> bool:
     if frame_times:
         return (time.monotonic() - frame_times[-1]) < 5.0
     return False
+
+
+def health_snapshot() -> dict:
+    fps = 0.0
+    if len(frame_times) >= 2:
+        elapsed = frame_times[-1] - frame_times[0]
+        if elapsed > 0:
+            fps = (len(frame_times) - 1) / elapsed
+    connected = is_esp32_connected()
+    mode = "websocket" if esp32_websocket is not None else ("push" if connected else "none")
+    return {"fps": round(fps, 1), "esp32_connected": connected, "mode": mode}

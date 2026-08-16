@@ -9,7 +9,7 @@ import time
 from fastapi import APIRouter, Depends, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 
-from .. import state
+from .. import hub, state
 from ..core import config
 from ..core.security import get_current_user
 
@@ -37,14 +37,7 @@ async def stream(_: str = Depends(get_current_user)):
 # ── Health endpoint ───────────────────────────────────────────────────────────
 @router.get("/health")
 async def health(_: str = Depends(get_current_user)):
-    fps = 0.0
-    if len(state.frame_times) >= 2:
-        elapsed = state.frame_times[-1] - state.frame_times[0]
-        if elapsed > 0:
-            fps = (len(state.frame_times) - 1) / elapsed
-    connected = state.is_esp32_connected()
-    mode = "websocket" if state.esp32_websocket is not None else ("push" if connected else "none")
-    return {"status": "ok", "fps": round(fps, 1), "esp32_connected": connected, "mode": mode}
+    return {"status": "ok", **state.health_snapshot()}
 
 
 # ── ESP32 push endpoint ───────────────────────────────────────────────────────
@@ -56,6 +49,7 @@ async def push_frame(request: Request):
     state.latest_frame = await request.body()
     state.frame_times.append(time.monotonic())
     state.frame_event.set()
+    await hub.broadcast_health()
     return {"status": "ok"}
 
 
@@ -68,6 +62,7 @@ async def websocket_endpoint(websocket: WebSocket):
         return
     await websocket.accept()
     state.esp32_websocket = websocket
+    await hub.broadcast_health(force=True)
     try:
         while True:
             msg = await websocket.receive()
@@ -75,6 +70,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 state.latest_frame = msg["bytes"]
                 state.frame_times.append(time.monotonic())
                 state.frame_event.set()
+                await hub.broadcast_health()
             elif "text" in msg and msg["text"]:
                 text = msg["text"]
                 if text.startswith("{"):
@@ -83,9 +79,11 @@ async def websocket_endpoint(websocket: WebSocket):
                         if "framesize" in data or "quality" in data:
                             state.camera_settings.update({k: v for k, v in data.items() if k in state.camera_settings})
                             state.esp32_settings_event.set()
+                            await hub.broadcast_settings()
                     except json.JSONDecodeError:
                         pass
     except WebSocketDisconnect:
         pass
     finally:
         state.esp32_websocket = None
+        await hub.broadcast_health(force=True)

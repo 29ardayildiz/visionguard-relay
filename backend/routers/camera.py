@@ -3,7 +3,7 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .. import state
+from .. import hub, state
 from ..core.security import get_current_user
 
 router = APIRouter(prefix="/api/camera")
@@ -31,6 +31,7 @@ async def set_camera_setting(request: Request, _: str = Depends(get_current_user
         except Exception:
             pass
 
+    await hub.broadcast_settings()
     return {"status": "ok", "key": key, "value": value}
 
 
@@ -46,6 +47,7 @@ async def apply_all_settings(_: str = Depends(get_current_user)):
             await asyncio.sleep(0.05)
         except Exception:
             break
+    await hub.broadcast_settings()
     return {"status": "ok", "applied": count}
 
 

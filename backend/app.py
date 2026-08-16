@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from .routers import auth, camera, pages, pwa, stream
+from .routers import auth, camera, client_ws, pages, pwa, stream
 
 # ── App ───────────────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address)
@@ -28,6 +28,7 @@ app.include_router(auth.router)
 app.include_router(pages.router)
 app.include_router(stream.router)
 app.include_router(camera.router)
+app.include_router(client_ws.router)
 app.include_router(pwa.router)
 
 # NOT (Faz 7 — Cutover): frontend/dist statik mount'u burada, tüm router
