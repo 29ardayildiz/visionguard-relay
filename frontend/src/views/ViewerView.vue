@@ -100,8 +100,14 @@ function downloadSnapshot(): void {
       const a = document.createElement('a')
       a.href = url
       a.download = `visionguard-${Date.now()}.jpg`
+      // Anchor'ın DOM'a eklenmesi gerekiyor — bazı tarayıcılar/otomasyon
+      // ortamları detached bir elemanda click()'i indirme olarak saymıyor.
+      document.body.appendChild(a)
       a.click()
-      URL.revokeObjectURL(url)
+      a.remove()
+      // revoke'u hemen çağırmak, indirme henüz blob'u okumaya başlamadan
+      // URL'yi geçersiz kılabilir; bir sonraki tick'e erteliyoruz.
+      setTimeout(() => URL.revokeObjectURL(url), 0)
     },
     'image/jpeg',
     0.92,
