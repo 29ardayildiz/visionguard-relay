@@ -15,11 +15,13 @@ function onChange(event: Event): void {
 </script>
 
 <template>
-  <div class="flex items-center gap-4">
-    <label class="w-28 shrink-0 text-xs text-guard-secondary">{{ label }}</label>
+  <!-- SliderControl ile aynı mobile-first desen: dar ekranda label üstte,
+  select altta tam genişlik; sm: üzerinde yatay düzen. -->
+  <div class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
+    <label class="text-sm text-guard-secondary sm:w-28 sm:shrink-0">{{ label }}</label>
     <select
       :value="modelValue"
-      class="min-h-11 flex-1 rounded-lg border border-guard-border bg-guard-bg px-3 py-2.5 text-sm text-guard-primary outline-none focus:border-brand"
+      class="min-h-11 w-full rounded-lg border border-guard-border bg-guard-bg px-3 py-2.5 text-sm text-guard-primary outline-none focus:border-brand sm:flex-1"
       @change="onChange"
     >
       <option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>

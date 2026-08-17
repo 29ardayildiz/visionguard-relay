@@ -46,8 +46,16 @@ function onPointerUp(event: Event): void {
 </script>
 
 <template>
-  <div class="flex items-center gap-4">
-    <label class="w-28 shrink-0 text-xs text-guard-secondary">{{ label }}</label>
+  <!-- Mobile-first (iOS Ayarlar deseni): dar ekranda label + değer üst satırda,
+  slider altta TAM genişlik — 112px'lik sabit label sütunu slider'ı ezmiyor.
+  sm: ve üzerinde klasik yatay düzen (label | slider | değer) korunur. -->
+  <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
+    <div class="flex items-center justify-between sm:w-28 sm:shrink-0 sm:justify-start">
+      <label class="text-sm text-guard-secondary">{{ label }}</label>
+      <span class="font-mono text-sm text-brand-accent tabular-nums sm:hidden">
+        {{ modelValue }}
+      </span>
+    </div>
     <div class="flex flex-1 items-center gap-3">
       <input
         type="range"
@@ -59,7 +67,7 @@ function onPointerUp(event: Event): void {
         @input="onInput"
         @pointerup="onPointerUp"
       />
-      <span class="w-8 shrink-0 text-right font-mono text-xs text-brand-accent tabular-nums">
+      <span class="hidden w-8 shrink-0 text-right font-mono text-xs text-brand-accent tabular-nums sm:block">
         {{ modelValue }}
       </span>
     </div>

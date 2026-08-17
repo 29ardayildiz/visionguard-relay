@@ -145,7 +145,7 @@ async function onApplyAll(): Promise<void> {
       <!-- Gerçek değerler backend'den gelene kadar panel soluk + etkileşimsiz:
       varsayılan -> gerçek değer "sıçraması" görünmez, yanlış değere dokunulamaz. -->
       <div
-        class="mx-auto max-w-2xl space-y-4 p-4 pb-28 transition-opacity duration-200"
+        class="mx-auto max-w-2xl space-y-4 p-4 pb-44 transition-opacity duration-200 sm:pb-28"
         :class="!camera.loaded && 'pointer-events-none opacity-40'"
       >
         <!-- Quick Presets -->
@@ -297,7 +297,7 @@ async function onApplyAll(): Promise<void> {
 
       <!-- Advanced -->
       <SettingsCard title="Advanced" :icon="cardAdvancedSvg">
-        <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+        <div class="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
           <ToggleControl
             label="BPC"
             :model-value="Boolean(camera.settings.bpc)"
@@ -349,7 +349,7 @@ async function onApplyAll(): Promise<void> {
 
     <!-- Alt sabit aksiyon barı -->
     <footer
-      class="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-2 border-t border-guard-border bg-guard-bg/90 px-4 py-3 backdrop-blur-md"
+      class="fixed inset-x-0 bottom-0 z-20 flex flex-col gap-2 border-t border-guard-border bg-guard-bg/90 px-4 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between"
       :style="{
         paddingBottom: 'calc(var(--sab) + 0.75rem)',
         paddingLeft: 'calc(var(--sal) + 1rem)',
@@ -359,7 +359,7 @@ async function onApplyAll(): Promise<void> {
       <div class="flex gap-2">
         <button
           type="button"
-          class="flex min-h-11 items-center gap-2 rounded-lg bg-guard-elevated px-4 text-sm font-semibold text-guard-primary transition-colors hover:bg-guard-border active:scale-95"
+          class="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-guard-elevated px-4 text-sm font-semibold text-guard-primary transition-colors hover:bg-guard-border active:scale-95 sm:flex-initial"
           @click="onSync"
         >
           <AppIcon :svg="actionSyncSvg" class="h-5 w-5" />
@@ -367,7 +367,7 @@ async function onApplyAll(): Promise<void> {
         </button>
         <button
           type="button"
-          class="flex min-h-11 items-center gap-2 rounded-lg border border-guard-border px-4 text-sm font-semibold text-guard-secondary transition-colors hover:bg-guard-surface active:scale-95"
+          class="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-guard-border px-4 text-sm font-semibold text-guard-secondary transition-colors hover:bg-guard-surface active:scale-95 sm:flex-initial"
           @click="onReset"
         >
           <AppIcon :svg="actionResetSvg" class="h-5 w-5" />
@@ -376,7 +376,7 @@ async function onApplyAll(): Promise<void> {
       </div>
       <button
         type="button"
-        class="flex min-h-11 items-center gap-2 rounded-lg bg-brand px-6 text-sm font-bold text-guard-bg shadow-lg shadow-brand/10 transition-all hover:bg-brand-hover active:scale-95"
+        class="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-brand px-6 text-sm font-bold text-guard-bg shadow-lg shadow-brand/10 transition-all hover:bg-brand-hover active:scale-95 sm:min-h-11 sm:w-auto"
         @click="onApplyAll"
       >
         <AppIcon :svg="actionApplySvg" class="h-5 w-5" />

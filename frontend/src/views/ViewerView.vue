@@ -252,7 +252,7 @@ function downloadSnapshot(): void {
   <main class="relative h-full bg-guard-bg">
     <!-- Üst durum katmanı -->
     <header
-      class="fixed inset-x-0 top-0 z-20 flex items-center justify-between p-4"
+      class="fixed inset-x-0 top-0 z-20 flex items-center justify-between gap-3 p-4"
       :style="{
         paddingTop: 'calc(var(--sat) + 1rem)',
         paddingLeft: 'calc(var(--sal) + 1rem)',
@@ -260,19 +260,19 @@ function downloadSnapshot(): void {
       }"
     >
       <div
-        class="flex items-center gap-2 rounded-full border border-guard-border bg-guard-surface/80 px-3 py-1.5 text-xs text-guard-secondary backdrop-blur-md"
+        class="flex min-w-0 items-center gap-2 rounded-full border border-guard-border bg-guard-surface/80 px-3 py-1.5 text-xs text-guard-secondary backdrop-blur-md"
       >
         <span
-          class="h-2 w-2 rounded-full"
+          class="h-2 w-2 shrink-0 rounded-full"
           :class="[statusMeta.dotClass, connection.status === 'live' && 'animate-pulse']"
         />
-        <span>{{ statusMeta.label }}</span>
+        <span class="truncate">{{ statusMeta.label }}</span>
         <!-- fps > 0 koşulu: ESP32 bağlı ama henüz kare akmıyorken (ilk
         bağlanma anı, ya da bağlı-ama-sessiz kenar durumu) "0.0 FPS" gibi
         tuhaf bir gösterge yerine yalnızca durum etiketi görünür. -->
         <span
           v-if="connection.status === 'live' && connection.fps > 0"
-          class="font-mono text-guard-primary tabular-nums"
+          class="shrink-0 font-mono text-guard-primary tabular-nums"
         >
           {{ connection.fps.toFixed(1) }} FPS
         </span>
