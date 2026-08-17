@@ -41,14 +41,14 @@ function onLater(): void {
         <button
           type="button"
           :disabled="updating"
-          class="shrink-0 rounded-lg bg-brand px-3 py-2 text-xs font-bold text-guard-bg transition-all active:scale-95 hover:bg-brand-hover disabled:opacity-60"
+          class="shrink-0 min-h-11 rounded-lg bg-brand px-4 text-sm font-bold text-guard-bg transition-all active:scale-95 hover:bg-brand-hover disabled:opacity-60"
           @click="onUpdate"
         >
           {{ updating ? '...' : 'Güncelle' }}
         </button>
         <button
           type="button"
-          class="shrink-0 rounded-lg px-2 py-2 text-xs text-guard-secondary transition-all active:scale-95 hover:text-guard-primary"
+          class="shrink-0 min-h-11 rounded-lg px-3 text-sm text-guard-secondary transition-all active:scale-95 hover:text-guard-primary"
           @click="onLater"
         >
           Sonra

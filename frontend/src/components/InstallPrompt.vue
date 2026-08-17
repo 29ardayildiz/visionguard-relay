@@ -44,14 +44,14 @@ function onInstallClick(): void {
         <button
           v-if="install.canPromptInstall"
           type="button"
-          class="shrink-0 rounded-lg bg-brand px-3 py-2 text-xs font-bold text-guard-bg transition-colors hover:bg-brand-hover active:scale-95"
+          class="shrink-0 min-h-11 rounded-lg bg-brand px-4 text-sm font-bold text-guard-bg transition-colors hover:bg-brand-hover active:scale-95"
           @click="onInstallClick"
         >
           Ekle
         </button>
         <button
           type="button"
-          class="shrink-0 rounded-lg px-2 py-2 text-xs text-guard-secondary transition-all active:scale-95 hover:text-guard-primary"
+          class="shrink-0 min-h-11 rounded-lg px-3 text-sm text-guard-secondary transition-all active:scale-95 hover:text-guard-primary"
           @click="install.dismiss"
         >
           ✕

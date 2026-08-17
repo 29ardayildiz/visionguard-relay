@@ -280,10 +280,10 @@ function downloadSnapshot(): void {
 
       <button
         type="button"
-        class="flex h-9 w-9 items-center justify-center rounded-full border border-guard-border bg-guard-surface/80 text-guard-secondary backdrop-blur-md transition-colors hover:text-brand active:scale-95"
+        class="flex h-11 w-11 items-center justify-center rounded-full border border-guard-border bg-guard-surface/80 text-guard-secondary backdrop-blur-md transition-colors hover:text-brand active:scale-95"
         @click="goAdmin"
       >
-        <AppIcon :svg="actionSettingsSvg" class="h-4 w-4" />
+        <AppIcon :svg="actionSettingsSvg" class="h-5 w-5" />
       </button>
     </header>
 
@@ -343,15 +343,15 @@ function downloadSnapshot(): void {
       >
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95"
+          class="flex min-h-11 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95"
           @click="logout"
         >
-          <AppIcon :svg="actionLogoutSvg" class="h-4 w-4" />
+          <AppIcon :svg="actionLogoutSvg" class="h-5 w-5" />
           Çıkış
         </button>
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95"
+          class="flex min-h-11 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95"
           @click="toggleFullscreen"
         >
           Tam Ekran
@@ -359,7 +359,7 @@ function downloadSnapshot(): void {
         <button
           type="button"
           :disabled="connection.status !== 'live'"
-          class="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95 disabled:pointer-events-none disabled:opacity-40"
+          class="flex min-h-11 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95 disabled:pointer-events-none disabled:opacity-40"
           @click="downloadSnapshot"
         >
           Snapshot

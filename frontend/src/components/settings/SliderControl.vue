@@ -16,8 +16,11 @@ const props = defineProps<{
 const fillPercent = computed(() =>
   props.max === props.min ? 0 : ((props.modelValue - props.min) / (props.max - props.min)) * 100,
 )
+// `background` shorthand DEĞİL, `backgroundImage`: shorthand, index.css'teki
+// background-clip: content-box'ı (44px dokunma alanı / 4px görsel iz ayrımını
+// sağlayan mekanizma) sıfırlardı.
 const trackStyle = computed(() => ({
-  background: `linear-gradient(to right, var(--color-brand-accent) 0%, var(--color-brand-accent) ${fillPercent.value}%, var(--color-guard-elevated) ${fillPercent.value}%, var(--color-guard-elevated) 100%)`,
+  backgroundImage: `linear-gradient(to right, var(--color-brand-accent) 0%, var(--color-brand-accent) ${fillPercent.value}%, var(--color-guard-elevated) ${fillPercent.value}%, var(--color-guard-elevated) 100%)`,
 }))
 
 const emit = defineEmits<{

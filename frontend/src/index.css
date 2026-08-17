@@ -92,17 +92,23 @@ img {
 input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
-  height: 4px;
+  /* Dokunma alanı 44px (Apple HIG minimumu); görsel iz yalnızca 4px'lik
+     content-box'ta kalır — background-clip, gradient/zemin rengini dikey
+     padding'in dışında tutar. Parmakla yakalama alanı 11 kat büyüdü. */
+  height: 44px;
+  padding: 20px 0;
+  box-sizing: border-box;
+  background-clip: content-box;
   border-radius: 9999px;
-  background: var(--color-guard-elevated);
+  background-color: var(--color-guard-elevated);
   outline: none;
 }
 
 input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 9999px;
   background: var(--color-guard-primary);
   border: 2px solid var(--color-brand);
@@ -111,8 +117,8 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 input[type='range']::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 9999px;
   background: var(--color-guard-primary);
   border: 2px solid var(--color-brand);

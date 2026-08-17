@@ -122,7 +122,7 @@ async function onApplyAll(): Promise<void> {
     >
       <button
         type="button"
-        class="text-xs text-guard-secondary transition-all active:scale-95 hover:text-guard-primary"
+        class="-ml-2 min-h-11 rounded-lg px-3 text-sm text-guard-secondary transition-all active:scale-95 hover:text-guard-primary"
         @click="goViewer"
       >
         ‹ Canlı
@@ -154,10 +154,10 @@ async function onApplyAll(): Promise<void> {
           v-for="preset in PRESETS"
           :key="preset.key"
           type="button"
-          class="flex flex-col items-center gap-1.5 rounded-lg px-2 py-2.5 text-[11px] font-semibold text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95"
+          class="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-xs font-semibold text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95"
           @click="onPreset(preset.key)"
         >
-          <AppIcon :svg="preset.icon" class="h-5 w-5 text-brand-accent" />
+          <AppIcon :svg="preset.icon" class="h-6 w-6 text-brand-accent" />
           {{ preset.label }}
         </button>
       </div>
@@ -359,27 +359,27 @@ async function onApplyAll(): Promise<void> {
       <div class="flex gap-2">
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-lg bg-guard-elevated px-4 py-2.5 text-xs font-semibold text-guard-primary transition-colors hover:bg-guard-border active:scale-95"
+          class="flex min-h-11 items-center gap-2 rounded-lg bg-guard-elevated px-4 text-sm font-semibold text-guard-primary transition-colors hover:bg-guard-border active:scale-95"
           @click="onSync"
         >
-          <AppIcon :svg="actionSyncSvg" class="h-4 w-4" />
+          <AppIcon :svg="actionSyncSvg" class="h-5 w-5" />
           Sync
         </button>
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-lg border border-guard-border px-4 py-2.5 text-xs font-semibold text-guard-secondary transition-colors hover:bg-guard-surface active:scale-95"
+          class="flex min-h-11 items-center gap-2 rounded-lg border border-guard-border px-4 text-sm font-semibold text-guard-secondary transition-colors hover:bg-guard-surface active:scale-95"
           @click="onReset"
         >
-          <AppIcon :svg="actionResetSvg" class="h-4 w-4" />
+          <AppIcon :svg="actionResetSvg" class="h-5 w-5" />
           Reset
         </button>
       </div>
       <button
         type="button"
-        class="flex items-center gap-1.5 rounded-lg bg-brand px-6 py-2.5 text-xs font-bold text-guard-bg shadow-lg shadow-brand/10 transition-all hover:bg-brand-hover active:scale-95"
+        class="flex min-h-11 items-center gap-2 rounded-lg bg-brand px-6 text-sm font-bold text-guard-bg shadow-lg shadow-brand/10 transition-all hover:bg-brand-hover active:scale-95"
         @click="onApplyAll"
       >
-        <AppIcon :svg="actionApplySvg" class="h-4 w-4" />
+        <AppIcon :svg="actionApplySvg" class="h-5 w-5" />
         Apply All
       </button>
     </footer>
