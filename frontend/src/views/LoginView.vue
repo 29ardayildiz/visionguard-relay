@@ -54,7 +54,7 @@ async function handleSubmit() {
   <main class="flex min-h-full items-center justify-center bg-guard-bg p-4">
     <form
       :class="[
-        'w-full max-w-sm rounded-2xl border border-guard-border bg-guard-surface/80 p-8 backdrop-blur-md',
+        'w-full max-w-sm rounded-2xl border border-guard-border bg-guard-surface/80 p-6 backdrop-blur-md sm:p-8',
         shaking && 'animate-shake',
       ]"
       @submit.prevent="handleSubmit"
@@ -75,11 +75,11 @@ async function handleSubmit() {
             required
             autofocus
             placeholder=" "
-            class="peer w-full rounded-lg border border-guard-border bg-guard-elevated px-4 pt-5 pb-2 text-sm text-guard-primary outline-none focus:border-brand"
+            class="peer w-full rounded-lg border border-guard-border bg-guard-elevated px-4 pt-5 pb-2 text-base text-guard-primary outline-none focus:border-brand"
           />
           <label
             for="username"
-            class="pointer-events-none absolute top-1 left-4 text-xs text-guard-secondary transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-focus:top-1 peer-focus:text-xs peer-focus:text-brand"
+            class="pointer-events-none absolute top-1 left-4 text-xs text-guard-secondary transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-base peer-focus:top-1 peer-focus:text-xs peer-focus:text-brand"
           >
             Kullanıcı Adı
           </label>
@@ -93,11 +93,11 @@ async function handleSubmit() {
             autocomplete="current-password"
             required
             placeholder=" "
-            class="peer w-full rounded-lg border border-guard-border bg-guard-elevated px-4 pt-5 pb-2 text-sm text-guard-primary outline-none focus:border-brand"
+            class="peer w-full rounded-lg border border-guard-border bg-guard-elevated px-4 pt-5 pb-2 text-base text-guard-primary outline-none focus:border-brand"
           />
           <label
             for="password"
-            class="pointer-events-none absolute top-1 left-4 text-xs text-guard-secondary transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-focus:top-1 peer-focus:text-xs peer-focus:text-brand"
+            class="pointer-events-none absolute top-1 left-4 text-xs text-guard-secondary transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-base peer-focus:top-1 peer-focus:text-xs peer-focus:text-brand"
           >
             Şifre
           </label>
@@ -106,7 +106,7 @@ async function handleSubmit() {
 
       <p
         v-if="error"
-        class="selectable mt-4 rounded-lg border border-status-offline/30 bg-status-offline/10 px-3 py-2 text-center text-xs text-status-offline"
+        class="selectable mt-4 rounded-lg border border-status-offline/30 bg-status-offline/10 px-3 py-2 text-center text-sm text-status-offline"
       >
         Kullanıcı adı veya şifre hatalı.
       </p>
@@ -114,7 +114,7 @@ async function handleSubmit() {
       <button
         type="submit"
         :disabled="loading"
-        class="mt-6 w-full rounded-xl bg-brand py-3 text-sm font-bold text-guard-bg transition-all hover:bg-brand-hover active:scale-[0.98] disabled:opacity-60"
+        class="mt-6 w-full rounded-xl bg-brand py-3 text-base font-bold text-guard-bg transition-all hover:bg-brand-hover active:scale-[0.98] disabled:opacity-60"
       >
         {{ loading ? 'Giriş yapılıyor...' : 'Giriş Yap' }}
       </button>

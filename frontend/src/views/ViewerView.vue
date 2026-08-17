@@ -260,7 +260,7 @@ function downloadSnapshot(): void {
       }"
     >
       <div
-        class="flex min-w-0 items-center gap-2 rounded-full border border-guard-border bg-guard-surface/80 px-3 py-1.5 text-xs text-guard-secondary backdrop-blur-md"
+        class="flex min-w-0 items-center gap-2 rounded-full border border-guard-border bg-guard-surface/80 px-3 py-1.5 text-sm text-guard-secondary backdrop-blur-md"
       >
         <span
           class="h-2 w-2 shrink-0 rounded-full"

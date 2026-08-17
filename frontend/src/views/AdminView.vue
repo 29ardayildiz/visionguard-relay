@@ -129,7 +129,7 @@ async function onApplyAll(): Promise<void> {
       </button>
       <h1 class="text-sm font-semibold text-guard-primary">Kamera Ayarları</h1>
       <div
-        class="flex items-center gap-1.5 rounded-full border border-guard-border bg-guard-surface px-3 py-1 text-[11px] text-guard-secondary"
+        class="flex items-center gap-1.5 rounded-full border border-guard-border bg-guard-surface px-3 py-1 text-xs text-guard-secondary"
       >
         <span
           class="h-1.5 w-1.5 rounded-full"
@@ -341,7 +341,7 @@ async function onApplyAll(): Promise<void> {
         </div>
       </SettingsCard>
 
-      <p class="selectable pt-1 text-center text-[11px] text-guard-muted">
+      <p class="selectable pt-1 text-center text-xs text-guard-muted">
         VisionGuard · v{{ APP_VERSION }}
       </p>
       </div>
