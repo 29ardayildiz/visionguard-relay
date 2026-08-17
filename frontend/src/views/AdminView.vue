@@ -106,7 +106,7 @@ async function onApplyAll(): Promise<void> {
     >
       <button
         type="button"
-        class="text-xs text-guard-secondary transition-colors hover:text-guard-primary"
+        class="text-xs text-guard-secondary transition-all active:scale-95 hover:text-guard-primary"
         @click="goViewer"
       >
         ‹ Canlı

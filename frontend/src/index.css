@@ -58,7 +58,11 @@ body {
 body,
 button,
 a,
-[role='button'] {
+select,
+label,
+input[type='range'],
+[role='button'],
+[role='switch'] {
   user-select: none;
   touch-action: manipulation;
 }

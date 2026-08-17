@@ -43,7 +43,7 @@ function onInstallClick(): void {
         </button>
         <button
           type="button"
-          class="shrink-0 rounded-lg px-2 py-2 text-xs text-guard-secondary transition-colors hover:text-guard-primary"
+          class="shrink-0 rounded-lg px-2 py-2 text-xs text-guard-secondary transition-all active:scale-95 hover:text-guard-primary"
           @click="install.dismiss"
         >
           ✕
