@@ -40,6 +40,13 @@ body,
   height: 100%;
 }
 
+html,
+body {
+  /* Yatay overscroll'un tarayıcının kenardan kaydırma ile ileri/geri
+     navigasyon jestine dönüşmesini engeller (MASTER.md §8: anti-web). */
+  overscroll-behavior-x: none;
+}
+
 body {
   background-color: var(--color-guard-bg);
   color: var(--color-guard-primary);
