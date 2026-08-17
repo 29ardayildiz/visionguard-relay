@@ -35,7 +35,9 @@ async function handleSubmit() {
   loading.value = false
 
   if (ok) {
-    router.push({ name: 'viewer' })
+    // push değil replace: giriş yapmış bir kullanıcının "geri" jestiyle
+    // login formuna dönmesi istenmiyor — bu bir durum geçişi, drill-in değil.
+    router.replace({ name: 'viewer' })
     return
   }
 

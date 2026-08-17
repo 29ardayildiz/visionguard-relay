@@ -47,7 +47,10 @@ function vibrate(): void {
 }
 
 function goAdmin(): void {
-  router.push({ name: 'admin' })
+  // Viewer <-> Admin bu uygulamanın tek "sekme çifti" — push kullanmak her
+  // geçişte geçmişe yeni kayıt ekleyip swipe-back'in web sitesi gibi tek tek
+  // "geri sarılmasına" yol açıyordu. replace ile tek kayıt, sekmesi değişiyor.
+  router.replace({ name: 'admin' })
 }
 
 function logout(): void {

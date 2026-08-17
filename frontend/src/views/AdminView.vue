@@ -56,7 +56,8 @@ function vibrate(): void {
 }
 
 function goViewer(): void {
-  router.push({ name: 'viewer' })
+  // Bkz. ViewerView.vue goAdmin() — aynı sekme çifti, aynı gerekçe: replace.
+  router.replace({ name: 'viewer' })
 }
 
 async function commitSetting<K extends keyof CameraSettings>(key: K, value: CameraSettings[K]): Promise<void> {
