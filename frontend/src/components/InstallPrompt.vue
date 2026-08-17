@@ -2,13 +2,21 @@
 import { computed } from 'vue'
 
 import appIconUrl from '../icons/pwa/app-icon.svg'
+import { usePwaUpdate } from '../composables/usePwaUpdate'
 import { useConnectionStore } from '../stores/connection'
 import { useInstallStore } from '../stores/install'
 
 const connection = useConnectionStore()
 const install = useInstallStore()
+// Destructure şart: usePwaUpdate düz obje döndürdüğü için showPrompt bir Ref —
+// `!pwaUpdate.showPrompt` yazılsaydı Ref objesi her zaman truthy olurdu.
+const { showPrompt: updatePromptVisible } = usePwaUpdate()
 
-const visible = computed(() => connection.hasSeenLive && install.canShowInstallCard)
+// Güncelleme kartı öncelikli — ikisi de alt kenara sabitlendiği için aynı anda
+// gösterilmez; güncelleme kapatılınca/uygulanınca install kartı geri gelir.
+const visible = computed(
+  () => connection.hasSeenLive && install.canShowInstallCard && !updatePromptVisible.value,
+)
 
 function onInstallClick(): void {
   void install.promptInstall()

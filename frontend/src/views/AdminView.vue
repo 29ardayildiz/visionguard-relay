@@ -21,6 +21,7 @@ import presetHighQualitySvg from '../icons/presets/preset-high-quality.svg?raw'
 import presetNightModeSvg from '../icons/presets/preset-night-mode.svg?raw'
 
 import { useAuthGuard } from '../lib/auth'
+import { APP_VERSION } from '../lib/version'
 import {
   FRAMESIZE_OPTIONS,
   GAINCEILING_OPTIONS,
@@ -320,6 +321,10 @@ async function onApplyAll(): Promise<void> {
           />
         </div>
       </SettingsCard>
+
+      <p class="selectable pt-1 text-center text-[11px] text-guard-muted">
+        VisionGuard · v{{ APP_VERSION }}
+      </p>
       </div>
     </div>
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppToast from './components/AppToast.vue'
 import InstallPrompt from './components/InstallPrompt.vue'
+import PwaUpdatePrompt from './components/PwaUpdatePrompt.vue'
 </script>
 
 <template>
@@ -11,4 +12,5 @@ import InstallPrompt from './components/InstallPrompt.vue'
   </RouterView>
   <AppToast />
   <InstallPrompt />
+  <PwaUpdatePrompt />
 </template>

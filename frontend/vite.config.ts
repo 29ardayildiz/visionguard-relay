@@ -13,7 +13,9 @@ export default defineConfig({
     vueDevTools(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': yeni SW indirilse bile otomatik aktive edilmez/reload olmaz;
+      // kullanıcı PwaUpdatePrompt kartından "Güncelle"ye basana kadar bekler.
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'favicon-32x32.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'VisionGuard',
