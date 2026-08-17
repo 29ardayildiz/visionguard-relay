@@ -98,10 +98,10 @@ async function onApplyAll(): Promise<void> {
 </script>
 
 <template>
-  <div class="min-h-full bg-guard-bg pb-24">
+  <div class="flex h-full flex-col bg-guard-bg">
     <!-- Üst bar -->
     <header
-      class="sticky top-0 z-20 flex items-center justify-between border-b border-guard-border bg-guard-bg/90 px-4 py-3 backdrop-blur-md"
+      class="z-20 flex shrink-0 items-center justify-between border-b border-guard-border bg-guard-bg/90 px-4 py-3 backdrop-blur-md"
       :style="{ paddingTop: 'calc(var(--sat) + 0.75rem)' }"
     >
       <button
@@ -123,8 +123,11 @@ async function onApplyAll(): Promise<void> {
       </div>
     </header>
 
-    <div class="mx-auto max-w-2xl space-y-4 p-4">
-      <!-- Quick Presets -->
+    <!-- İç kaydırılabilir içerik — body artık kaydırılamaz (anti-web: kenar
+    kaydırma jesti), bu yüzden scroll burada, kendi konteynerinde. -->
+    <div class="flex-1 overflow-y-auto overscroll-contain">
+      <div class="mx-auto max-w-2xl space-y-4 p-4 pb-24">
+        <!-- Quick Presets -->
       <div class="grid grid-cols-2 gap-2 rounded-xl border border-guard-border bg-guard-surface p-1.5 sm:grid-cols-4">
         <button
           v-for="preset in PRESETS"
@@ -316,6 +319,7 @@ async function onApplyAll(): Promise<void> {
           />
         </div>
       </SettingsCard>
+      </div>
     </div>
 
     <!-- Alt sabit aksiyon barı -->

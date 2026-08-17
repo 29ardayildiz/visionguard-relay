@@ -38,13 +38,13 @@ html,
 body,
 #app {
   height: 100%;
-}
-
-html,
-body {
-  /* Yatay overscroll'un tarayıcının kenardan kaydırma ile ileri/geri
-     navigasyon jestine dönüşmesini engeller (MASTER.md §8: anti-web). */
-  overscroll-behavior-x: none;
+  /* Belge seviyesinde scroll'u tamamen kaldırır — WebKit'in (iOS Safari,
+     standalone dahil) kenar-kaydırma ile ileri/geri jesti `overscroll-behavior`
+     CSS'ine güvenilir şekilde uymuyor; asıl çözüm sayfanın kaydırılabilir bir
+     "kenarı" olmasını engellemek. Ekran içeriği (ör. AdminView) kendi iç
+     `overflow-y: auto` konteynerinde kaydırılır. */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -54,7 +54,6 @@ body {
   padding-bottom: var(--sab);
   padding-left: var(--sal);
   padding-right: var(--sar);
-  overscroll-behavior-y: contain;
 }
 
 /* ── Anti-web polish (MASTER.md §8.1/§8.3, CLAUDE.md §4) ──────────────────── */
