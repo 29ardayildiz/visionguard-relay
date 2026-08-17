@@ -120,7 +120,7 @@ function downloadSnapshot(): void {
 </script>
 
 <template>
-  <main class="relative min-h-full bg-guard-bg">
+  <main class="relative h-full bg-guard-bg">
     <!-- Üst durum katmanı -->
     <header
       class="fixed inset-x-0 top-0 z-20 flex items-center justify-between p-4"
@@ -160,7 +160,7 @@ function downloadSnapshot(): void {
     <!-- Stream alanı -->
     <div
       :class="[
-        'flex min-h-full items-center justify-center overflow-hidden',
+        'flex h-full items-center justify-center overflow-hidden',
         isFullscreen ? 'fixed inset-0 z-30 bg-black' : 'p-4',
       ]"
       @touchstart="onTouchStart"

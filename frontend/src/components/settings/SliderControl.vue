@@ -43,7 +43,7 @@ function onPointerUp(event: Event): void {
         @input="onInput"
         @pointerup="onPointerUp"
       />
-      <span class="w-10 shrink-0 text-right font-mono text-xs text-brand-accent tabular-nums">
+      <span class="w-8 shrink-0 text-right font-mono text-xs text-brand-accent tabular-nums">
         {{ modelValue }}
       </span>
     </div>

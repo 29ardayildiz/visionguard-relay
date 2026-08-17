@@ -127,7 +127,7 @@ async function onApplyAll(): Promise<void> {
     <!-- İç kaydırılabilir içerik — body artık kaydırılamaz (anti-web: kenar
     kaydırma jesti), bu yüzden scroll burada, kendi konteynerinde. -->
     <div class="flex-1 overflow-y-auto overscroll-contain">
-      <div class="mx-auto max-w-2xl space-y-4 p-4 pb-24">
+      <div class="mx-auto max-w-2xl space-y-4 p-4 pb-28">
         <!-- Quick Presets -->
       <div class="grid grid-cols-2 gap-2 rounded-xl border border-guard-border bg-guard-surface p-1.5 sm:grid-cols-4">
         <button
