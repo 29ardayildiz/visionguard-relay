@@ -64,6 +64,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (streamRetryTimer) clearTimeout(streamRetryTimer)
+  void releaseWakeLock()
 })
 
 // Uygulama öne dönünce (veya stream başka bir sebeple yeniden aktive olunca)
@@ -71,6 +72,38 @@ onUnmounted(() => {
 watch(streamActive, (active) => {
   if (active) streamCacheBust.value = Date.now()
 })
+
+// Canlı izleme sırasında ekranın sönmesini engelle (native kamera izleme
+// uygulamalarının standart davranışı). Tarayıcı sentinel'i sekme arka plana
+// geçince kendisi bırakır; streamActive watch'ı öne dönüşte yeniden alır.
+// Desteklenmeyen tarayıcılarda sessiz no-op.
+let wakeLock: WakeLockSentinel | null = null
+
+async function syncWakeLock(active: boolean): Promise<void> {
+  if (active && !wakeLock && 'wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen')
+      wakeLock.addEventListener('release', () => {
+        wakeLock = null
+      })
+    } catch {
+      // Düşük pil modu vb. — tarayıcı reddedebilir, kritik değil.
+    }
+  } else if (!active && wakeLock) {
+    await releaseWakeLock()
+  }
+}
+
+async function releaseWakeLock(): Promise<void> {
+  try {
+    await wakeLock?.release()
+  } catch {
+    // zaten bırakılmış olabilir
+  }
+  wakeLock = null
+}
+
+watch(streamActive, (active) => void syncWakeLock(active), { immediate: true })
 
 // Donma tespiti: MJPEG bağlantısı sessizce ölürse (Render idle kesintisi, ağ
 // geçişi) <img> error üretir — rozet "Canlı" kalsa bile görüntü son karede

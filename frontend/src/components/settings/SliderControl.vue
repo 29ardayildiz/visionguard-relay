@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import { debounce } from '../../lib/debounce'
 
 const props = defineProps<{
@@ -7,6 +9,16 @@ const props = defineProps<{
   min: number
   max: number
 }>()
+
+// Dolgu (progress) rengi: native range input'ta cross-browser "lower fill"
+// olmadığı için iz, iki renkli bir linear-gradient ile boyanır (MASTER.md
+// §9.4: dolgu brand-accent, zemin guard-elevated).
+const fillPercent = computed(() =>
+  props.max === props.min ? 0 : ((props.modelValue - props.min) / (props.max - props.min)) * 100,
+)
+const trackStyle = computed(() => ({
+  background: `linear-gradient(to right, var(--color-brand-accent) 0%, var(--color-brand-accent) ${fillPercent.value}%, var(--color-guard-elevated) ${fillPercent.value}%, var(--color-guard-elevated) 100%)`,
+}))
 
 const emit = defineEmits<{
   'update:modelValue': [value: number]
@@ -39,7 +51,8 @@ function onPointerUp(event: Event): void {
         :min="min"
         :max="max"
         :value="modelValue"
-        class="h-1 w-full flex-1 cursor-pointer accent-brand-accent"
+        :style="trackStyle"
+        class="w-full flex-1 cursor-pointer"
         @input="onInput"
         @pointerup="onPointerUp"
       />

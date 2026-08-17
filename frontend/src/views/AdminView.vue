@@ -48,7 +48,13 @@ const PRESETS = [
 onMounted(async () => {
   if (await guard()) {
     connection.start()
-    await camera.fetchSettings()
+    const ok = await camera.fetchSettings()
+    if (!ok && !camera.loaded) {
+      // Gerçek değerler alınamadı — paneli sonsuza dek soluk bırakmak yerine
+      // varsayılanlarla etkileşime izin ver, ama kullanıcıyı uyar.
+      toast.show('Ayarlar yüklenemedi, varsayılanlar gösteriliyor', 'err')
+      camera.loaded = true
+    }
   }
 })
 
@@ -132,7 +138,12 @@ async function onApplyAll(): Promise<void> {
     <!-- İç kaydırılabilir içerik — body artık kaydırılamaz (anti-web: kenar
     kaydırma jesti), bu yüzden scroll burada, kendi konteynerinde. -->
     <div class="flex-1 overflow-y-auto overscroll-contain">
-      <div class="mx-auto max-w-2xl space-y-4 p-4 pb-28">
+      <!-- Gerçek değerler backend'den gelene kadar panel soluk + etkileşimsiz:
+      varsayılan -> gerçek değer "sıçraması" görünmez, yanlış değere dokunulamaz. -->
+      <div
+        class="mx-auto max-w-2xl space-y-4 p-4 pb-28 transition-opacity duration-200"
+        :class="!camera.loaded && 'pointer-events-none opacity-40'"
+      >
         <!-- Quick Presets -->
       <div class="grid grid-cols-2 gap-2 rounded-xl border border-guard-border bg-guard-surface p-1.5 sm:grid-cols-4">
         <button
