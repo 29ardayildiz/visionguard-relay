@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import AppIcon from '../components/AppIcon.vue'
@@ -16,16 +16,26 @@ const router = useRouter()
 const guard = useAuthGuard()
 const connection = useConnectionStore()
 
+const STREAM_RETRY_MS = 3000
+
 const streamImg = ref<HTMLImageElement | null>(null)
 const streamCacheBust = ref(Date.now())
 const streamUrl = computed(() => `/stream?t=${streamCacheBust.value}`)
 const isFullscreen = ref(false)
+let streamRetryTimer: ReturnType<typeof setTimeout> | null = null
+
+// Stream yalnızca canlı VE uygulama öndeyken mount edilir — arka planda
+// <img> DOM'dan kalkınca tarayıcı MJPEG bağlantısını kapatır (pil + veri).
+const streamActive = computed(() => connection.status === 'live' && connection.appVisible)
 
 const pulling = ref(false)
 const pullDistance = ref(0)
 let touchStartY = 0
 
 const statusMeta = computed(() => {
+  if (!connection.networkOnline) {
+    return { label: 'İnternet bağlantısı yok', dotClass: 'bg-status-offline' }
+  }
   switch (connection.status) {
     case 'live':
       return { label: 'Canlı', dotClass: 'bg-status-live' }
@@ -36,11 +46,44 @@ const statusMeta = computed(() => {
   }
 })
 
+const emptyStateMeta = computed(() => {
+  if (!connection.networkOnline) {
+    return { icon: cameraOfflineUrl, spin: false, text: 'İnternet bağlantısı yok' }
+  }
+  if (connection.status === 'waking') {
+    return { icon: loaderWakingUrl, spin: true, text: 'Sunucu uyanıyor, lütfen bekleyin...' }
+  }
+  return { icon: cameraOfflineUrl, spin: false, text: 'Kamera çevrimdışı' }
+})
+
 onMounted(async () => {
   if (await guard()) {
     connection.start()
   }
 })
+
+onUnmounted(() => {
+  if (streamRetryTimer) clearTimeout(streamRetryTimer)
+})
+
+// Uygulama öne dönünce (veya stream başka bir sebeple yeniden aktive olunca)
+// her zaman taze bir MJPEG bağlantısı başlat — bayat/donmuş kare kalmasın.
+watch(streamActive, (active) => {
+  if (active) streamCacheBust.value = Date.now()
+})
+
+// Donma tespiti: MJPEG bağlantısı sessizce ölürse (Render idle kesintisi, ağ
+// geçişi) <img> error üretir — rozet "Canlı" kalsa bile görüntü son karede
+// donardı. Kısa bir bekleme sonrası cache-bust ile otomatik yeniden bağlanır;
+// hata sürüyorsa her deneme yeni bir error üretip döngüyü (3sn aralıkla)
+// sürdürür, hızlı-döngüye giremez.
+function onStreamError(): void {
+  if (streamRetryTimer) clearTimeout(streamRetryTimer)
+  streamRetryTimer = setTimeout(() => {
+    streamRetryTimer = null
+    if (streamActive.value) streamCacheBust.value = Date.now()
+  }, STREAM_RETRY_MS)
+}
 
 function vibrate(): void {
   if ('vibrate' in navigator) navigator.vibrate(10)
@@ -169,25 +212,22 @@ function downloadSnapshot(): void {
       @dblclick="toggleFullscreen"
     >
       <img
-        v-if="connection.status === 'live'"
+        v-if="streamActive"
         ref="streamImg"
         :src="streamUrl"
         alt="Canlı yayın"
         class="max-h-full max-w-full object-contain"
         :class="isFullscreen ? 'rounded-none' : 'rounded-2xl'"
+        @error="onStreamError"
       />
       <div v-else class="flex flex-col items-center gap-3 px-4 text-center">
         <img
-          :src="connection.status === 'waking' ? loaderWakingUrl : cameraOfflineUrl"
+          :src="emptyStateMeta.icon"
           alt=""
           class="h-16 w-16"
-          :class="connection.status === 'waking' && 'animate-spin-slow'"
+          :class="emptyStateMeta.spin && 'animate-spin-slow'"
         />
-        <p class="text-sm text-guard-secondary">
-          {{
-            connection.status === 'waking' ? 'Sunucu uyanıyor, lütfen bekleyin...' : 'Kamera çevrimdışı'
-          }}
-        </p>
+        <p class="text-sm text-guard-secondary">{{ emptyStateMeta.text }}</p>
       </div>
     </div>
 

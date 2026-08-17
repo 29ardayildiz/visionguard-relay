@@ -28,16 +28,26 @@ type Unsubscribe = () => void
 const RECONNECT_BASE_MS = 1000
 const RECONNECT_MAX_MS = 15000
 
+// Bu sayıda ARDIŞIK başarısız bağlantı denemesinden sonra (hiç open olmadan
+// kapanma) onConnectionTrouble tetiklenir — çağıran taraf bunun bir auth
+// sorunu mu (JWT süresi dolmuş -> handshake 403) yoksa ağ/cold-start mı
+// olduğunu teşhis edebilir. Handshake reddi tarayıcıda her zaman generic 1006
+// olarak görünür, close code'dan ayırt edilemez; bu yüzden bu dolaylı sinyal.
+const TROUBLE_THRESHOLD = 3
+
 export class WsClient {
   private ws: WebSocket | null = null
   private reconnectDelay = RECONNECT_BASE_MS
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private manuallyClosed = true
   private status: ConnectionStatus = 'waking'
+  private openedThisAttempt = false
+  private failureStreak = 0
 
   private healthListeners = new Set<(payload: HealthPayload) => void>()
   private settingsListeners = new Set<(payload: SettingsPayload) => void>()
   private statusListeners = new Set<(status: ConnectionStatus) => void>()
+  private troubleListeners = new Set<() => void>()
 
   connect(): void {
     this.manuallyClosed = false
@@ -76,6 +86,11 @@ export class WsClient {
     return () => this.statusListeners.delete(fn)
   }
 
+  onConnectionTrouble(fn: () => void): Unsubscribe {
+    this.troubleListeners.add(fn)
+    return () => this.troubleListeners.delete(fn)
+  }
+
   private setStatus(next: ConnectionStatus): void {
     if (this.status === next) return
     this.status = next
@@ -92,6 +107,8 @@ export class WsClient {
 
     ws.onopen = () => {
       this.reconnectDelay = RECONNECT_BASE_MS
+      this.openedThisAttempt = true
+      this.failureStreak = 0
     }
 
     ws.onmessage = (event: MessageEvent<string>) => {
@@ -113,6 +130,13 @@ export class WsClient {
 
     ws.onclose = () => {
       this.ws = null
+      if (!this.openedThisAttempt) {
+        this.failureStreak++
+        if (this.failureStreak % TROUBLE_THRESHOLD === 0) {
+          this.troubleListeners.forEach((fn) => fn())
+        }
+      }
+      this.openedThisAttempt = false
       if (this.manuallyClosed) return
       this.setStatus('waking')
       const delay = this.reconnectDelay

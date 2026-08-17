@@ -20,13 +20,47 @@ export const useConnectionStore = defineStore('connection', () => {
   // gösterilir — localStorage'da kalıcı, oturumlar arası hatırlanır.
   const hasSeenLive = ref(localStorage.getItem(HAS_SEEN_LIVE_KEY) === '1')
 
+  // Native yaşam döngüsü durumu: uygulama arka plandayken stream/WS durdurulur
+  // (pil + veri), internet yokken UI dürüst bir "bağlantı yok" gösterebilir.
+  const appVisible = ref(document.visibilityState === 'visible')
+  const networkOnline = ref(navigator.onLine)
+
   const client = new WsClient()
   let started = false
+  let lifecycleInstalled = false
   const unsubscribers: Unsubscribe[] = []
+
+  function installLifecycleListeners(): void {
+    if (lifecycleInstalled) return
+    lifecycleInstalled = true
+
+    // Arka plana geçişte bağlantıyı BİLİNÇLİ kapatıyoruz, dönüşte taze
+    // bağlantı kuruyoruz. Bu, iOS'un dondurup close event'i vermeden zombie
+    // bıraktığı WebSocket'leri kökten imkânsız kılar (dönüşte socket zaten
+    // hep yeni) ve native uygulamaların arka plan davranışıyla birebir aynıdır.
+    document.addEventListener('visibilitychange', () => {
+      appVisible.value = document.visibilityState === 'visible'
+      if (!started) return
+      if (appVisible.value) {
+        client.reconnectNow()
+      } else {
+        client.disconnect()
+      }
+    })
+
+    window.addEventListener('online', () => {
+      networkOnline.value = true
+      if (started) client.reconnectNow()
+    })
+    window.addEventListener('offline', () => {
+      networkOnline.value = false
+    })
+  }
 
   function start(): void {
     if (started) return
     started = true
+    installLifecycleListeners()
 
     unsubscribers.push(
       client.onStatus((next) => {
@@ -50,8 +84,32 @@ export const useConnectionStore = defineStore('connection', () => {
         cameraSettings.value = rest
       }),
     )
+    unsubscribers.push(
+      client.onConnectionTrouble(() => {
+        void diagnoseConnectionTrouble()
+      }),
+    )
 
-    client.connect()
+    // Sayfa arka plandayken yüklendiyse (ör. sekme geri yüklemesi) bağlantıyı
+    // hemen kurma — görünür olduğunda visibilitychange handler'ı kuracak.
+    if (appVisible.value) client.connect()
+  }
+
+  // Art arda WS bağlantı başarısızlığında bir kez çalışır: sorun süresi dolmuş
+  // JWT mi (handshake 403 -> tarayıcıda generic 1006, close code'dan ayırt
+  // edilemez) yoksa ağ/cold-start mı? Tek seferlik bir /health teşhisi ile
+  // ayrıştırır — CLAUDE.md'nin yasakladığı periyodik polling DEĞİLDİR.
+  async function diagnoseConnectionTrouble(): Promise<void> {
+    try {
+      const response = await fetch('/health')
+      if (response.status === 401) {
+        // Oturum düştü: sonsuz "sunucu uyanıyor" yerine login'e yönlendir.
+        // api.ts'teki 401 davranışıyla aynı desen (tam navigasyon = tam reset).
+        window.location.href = '/login'
+      }
+    } catch {
+      // Ağ yok / sunucu uyanıyor — reconnect döngüsü zaten denemeye devam ediyor.
+    }
   }
 
   function stop(): void {
@@ -65,5 +123,17 @@ export const useConnectionStore = defineStore('connection', () => {
     client.reconnectNow()
   }
 
-  return { status, fps, esp32Connected, mode, cameraSettings, hasSeenLive, start, stop, reconnectNow }
+  return {
+    status,
+    fps,
+    esp32Connected,
+    mode,
+    cameraSettings,
+    hasSeenLive,
+    appVisible,
+    networkOnline,
+    start,
+    stop,
+    reconnectNow,
+  }
 })
