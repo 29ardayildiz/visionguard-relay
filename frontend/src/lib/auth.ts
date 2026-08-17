@@ -1,5 +1,3 @@
-import { useRouter } from 'vue-router'
-
 // Backend /login endpoint'i (Faz 7 cutover'a kadar) hâlâ form-encoded POST
 // bekleyip 303 redirect dönüyor (JSON API değil — CLAUDE.md: cutover'dan önce
 // eski Jinja2 route'ları bozulmamalı). fetch() redirect'leri otomatik takip
@@ -27,14 +25,3 @@ export async function isAuthenticated(): Promise<boolean> {
   }
 }
 
-// Korumalı ekranlarda (Viewer, Admin) onMounted içinde çağrılır — oturum
-// geçersizse sessizce /login'e yönlendirir (CLAUDE.md §6.2). `useRouter()`
-// senkron çağrılmalı, bu yüzden composable dönen fonksiyon async'tir.
-export function useAuthGuard() {
-  const router = useRouter()
-  return async function guard(): Promise<boolean> {
-    if (await isAuthenticated()) return true
-    router.replace({ name: 'login' })
-    return false
-  }
-}

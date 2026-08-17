@@ -36,9 +36,15 @@ for (const task of tasks) {
 const SPLASH_BG = '#090a0a'
 const splashes = [
   { w: 750, h: 1334 },  // 375x667 @2x — iPhone SE3 / 8
+  { w: 1125, h: 2436 }, // 375x812 @3x — iPhone X / XS / 11 Pro / 13 mini
+  { w: 828, h: 1792 },  // 414x896 @2x — iPhone XR / 11
+  { w: 1242, h: 2688 }, // 414x896 @3x — iPhone XS Max / 11 Pro Max
   { w: 1170, h: 2532 }, // 390x844 @3x — iPhone 14 / 13 / 12
-  { w: 1179, h: 2556 }, // 393x852 @3x — iPhone 15 / 14 Pro
-  { w: 1290, h: 2796 }, // 430x932 @3x — iPhone 15 Plus / Pro Max
+  { w: 1284, h: 2778 }, // 428x926 @3x — iPhone 12/13 Pro Max / 14 Plus
+  { w: 1179, h: 2556 }, // 393x852 @3x — iPhone 15 / 16 / 14 Pro
+  { w: 1290, h: 2796 }, // 430x932 @3x — iPhone 15/16 Plus, 15 Pro Max
+  { w: 1206, h: 2622 }, // 402x874 @3x — iPhone 16 Pro / 17 / 17 Pro
+  { w: 1320, h: 2868 }, // 440x956 @3x — iPhone 16/17 Pro Max
 ]
 
 for (const { w, h } of splashes) {

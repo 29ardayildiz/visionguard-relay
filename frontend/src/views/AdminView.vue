@@ -20,7 +20,6 @@ import presetHighFpsSvg from '../icons/presets/preset-high-fps.svg?raw'
 import presetHighQualitySvg from '../icons/presets/preset-high-quality.svg?raw'
 import presetNightModeSvg from '../icons/presets/preset-night-mode.svg?raw'
 
-import { useAuthGuard } from '../lib/auth'
 import { APP_VERSION } from '../lib/version'
 import {
   FRAMESIZE_OPTIONS,
@@ -33,7 +32,6 @@ import { useCameraStore, type CameraSettings } from '../stores/camera'
 import { useToastStore } from '../stores/toast'
 
 const router = useRouter()
-const guard = useAuthGuard()
 const connection = useConnectionStore()
 const camera = useCameraStore()
 const toast = useToastStore()
@@ -46,15 +44,14 @@ const PRESETS = [
 ] as const
 
 onMounted(async () => {
-  if (await guard()) {
-    connection.start()
-    const ok = await camera.fetchSettings()
-    if (!ok && !camera.loaded) {
+  // Auth kontrolü router guard'ında (render'dan önce) yapılıyor.
+  connection.start()
+  const ok = await camera.fetchSettings()
+  if (!ok && !camera.loaded) {
       // Gerçek değerler alınamadı — paneli sonsuza dek soluk bırakmak yerine
       // varsayılanlarla etkileşime izin ver, ama kullanıcıyı uyar.
-      toast.show('Ayarlar yüklenemedi, varsayılanlar gösteriliyor', 'err')
-      camera.loaded = true
-    }
+    toast.show('Ayarlar yüklenemedi, varsayılanlar gösteriliyor', 'err')
+    camera.loaded = true
   }
 })
 
@@ -141,7 +138,10 @@ async function onApplyAll(): Promise<void> {
 
     <!-- İç kaydırılabilir içerik — body artık kaydırılamaz (anti-web: kenar
     kaydırma jesti), bu yüzden scroll burada, kendi konteynerinde. -->
-    <div class="flex-1 overflow-y-auto overscroll-contain">
+    <div
+      class="flex-1 overflow-y-auto overscroll-contain"
+      :style="{ paddingLeft: 'var(--sal)', paddingRight: 'var(--sar)' }"
+    >
       <!-- Gerçek değerler backend'den gelene kadar panel soluk + etkileşimsiz:
       varsayılan -> gerçek değer "sıçraması" görünmez, yanlış değere dokunulamaz. -->
       <div

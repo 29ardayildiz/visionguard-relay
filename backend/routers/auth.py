@@ -31,7 +31,7 @@ async def login(
         httponly=True,
         secure=True,
         samesite="strict",
-        max_age=86400,
+        max_age=86400 * 30,
     )
     return response
 

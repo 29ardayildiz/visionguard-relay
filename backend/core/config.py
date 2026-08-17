@@ -14,7 +14,9 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_HOURS = 24
+# 30 gun: kisisel tek-kullanicili kamera uygulamasinda gunluk yeniden giris
+# gereksiz surtunmeydi (iOS standalone'da ozellikle rahatsiz edici).
+JWT_EXPIRE_HOURS = 24 * 30
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH")
 

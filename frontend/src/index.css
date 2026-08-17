@@ -47,13 +47,21 @@ body,
   overscroll-behavior: none;
 }
 
+#app {
+  /* iOS standalone'da kararlı viewport yüksekliği (dinamik bar oynamalarından
+     etkilenmez); dvh desteklemeyen eski tarayıcılara vh fallback. */
+  height: 100vh;
+  height: 100dvh;
+}
+
 body {
   background-color: var(--color-guard-bg);
   color: var(--color-guard-primary);
-  padding-top: var(--sat);
-  padding-bottom: var(--sab);
-  padding-left: var(--sal);
-  padding-right: var(--sar);
+  /* DİKKAT: Safe-area padding'i bilinçli olarak BODY'DE YOK. Tek kaynak
+     kuralı: her ekranın kendi bar'ları (viewer/admin header-footer, toast,
+     prompt kartları) --sat/--sab/--sal/--sar inset'lerini kendileri uygular.
+     Body'ye de eklemek, in-flow bar'larda safe-area'nın İKİ KEZ uygulanmasına
+     (iPhone'da ~130px'lik dev üst boşluk) yol açmıştı. */
 }
 
 /* ── Anti-web polish (MASTER.md §8.1/§8.3, CLAUDE.md §4) ──────────────────── */

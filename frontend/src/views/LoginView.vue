@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import appIconUrl from '../icons/pwa/app-icon.svg'
-import { isAuthenticated, login } from '../lib/auth'
+import { login } from '../lib/auth'
 
 const router = useRouter()
 
@@ -12,12 +12,6 @@ const password = ref('')
 const loading = ref(false)
 const error = ref(false)
 const shaking = ref(false)
-
-onMounted(async () => {
-  if (await isAuthenticated()) {
-    router.replace({ name: 'viewer' })
-  }
-})
 
 function vibrate() {
   if ('vibrate' in navigator) {
@@ -51,7 +45,15 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <main class="flex min-h-full items-center justify-center bg-guard-bg p-4">
+  <main
+    class="flex min-h-full items-center justify-center bg-guard-bg p-4"
+    :style="{
+      paddingTop: 'calc(var(--sat) + 1rem)',
+      paddingBottom: 'calc(var(--sab) + 1rem)',
+      paddingLeft: 'calc(var(--sal) + 1rem)',
+      paddingRight: 'calc(var(--sar) + 1rem)',
+    }"
+  >
     <form
       :class="[
         'w-full max-w-sm rounded-2xl border border-guard-border bg-guard-surface/80 p-6 backdrop-blur-md sm:p-8',

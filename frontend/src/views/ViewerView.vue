@@ -7,13 +7,11 @@ import cameraOfflineUrl from '../icons/status/camera-offline.svg'
 import actionLogoutSvg from '../icons/actions/action-logout.svg?raw'
 import actionSettingsSvg from '../icons/actions/action-settings.svg?raw'
 import loaderWakingUrl from '../icons/status/loader-waking.svg'
-import { useAuthGuard } from '../lib/auth'
 import { useConnectionStore } from '../stores/connection'
 
 const PULL_THRESHOLD = 70
 
 const router = useRouter()
-const guard = useAuthGuard()
 const connection = useConnectionStore()
 
 const STREAM_RETRY_MS = 3000
@@ -56,10 +54,9 @@ const emptyStateMeta = computed(() => {
   return { icon: cameraOfflineUrl, spin: false, text: 'Kamera çevrimdışı' }
 })
 
-onMounted(async () => {
-  if (await guard()) {
-    connection.start()
-  }
+onMounted(() => {
+  // Auth kontrolü router guard'ında (render'dan önce) yapılıyor.
+  connection.start()
 })
 
 onUnmounted(() => {
