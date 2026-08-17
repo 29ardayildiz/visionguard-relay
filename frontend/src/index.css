@@ -78,6 +78,15 @@ input[type='range'],
   user-select: text;
 }
 
+/* Görseller (stream, ikonlar, logo) uygulama içeriğidir, web kaynağı değil:
+   iOS'ta uzun basınca çıkan "Resmi Kaydet/Paylaş" callout menüsünü ve
+   masaüstünde sürükleyince oluşan ghost-drag'i kapat. */
+img {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
 /* ── Hatalı giriş geri bildirimi (MASTER.md §11.1) ────────────────────────── */
 @keyframes shake {
   10%,

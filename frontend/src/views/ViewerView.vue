@@ -96,12 +96,36 @@ function goAdmin(): void {
   router.replace({ name: 'admin' })
 }
 
-function logout(): void {
-  window.location.href = '/logout'
+async function logout(): Promise<void> {
+  // SPA içinde kal: tam sayfa navigasyonu (window.location) app-shell'i
+  // yeniden başlatıp kısa bir boş-ekran flaşı yaratıyordu. Cookie'yi fetch ile
+  // sildirip route geçişini animasyonlu şekilde router'a bırakıyoruz.
+  connection.stop()
+  try {
+    await fetch('/logout', { redirect: 'manual' })
+  } catch {
+    // Ağ yoksa bile lokal olarak login'e dön — cookie zaten sunucuda geçersiz
+    // sayılana kadar başka istek atılmayacak.
+  }
+  router.replace({ name: 'login' })
 }
 
 function toggleFullscreen(): void {
+  vibrate()
   isFullscreen.value = !isFullscreen.value
+}
+
+// Mobilde dblclick event'i gecikmeli/tutarsız — kendi double-tap algılayıcımız:
+// iki touchend arası < 300ms ve arada çekme jesti yoksa tam ekran toggle.
+// Ardından tarayıcının üretebileceği sentetik dblclick'i kısa süre bastırıyoruz
+// ki toggle iki kez çalışıp eski durumuna geri dönmesin.
+const DOUBLE_TAP_MS = 300
+let lastTapAt = 0
+let suppressDblclickUntil = 0
+
+function onDblclick(): void {
+  if (Date.now() < suppressDblclickUntil) return
+  toggleFullscreen()
 }
 
 function reconnect(): void {
@@ -123,11 +147,40 @@ function onTouchMove(event: TouchEvent): void {
 }
 
 function onTouchEnd(): void {
-  if (pulling.value && pullDistance.value > PULL_THRESHOLD) {
+  const pulled = pullDistance.value
+  if (pulling.value && pulled > PULL_THRESHOLD) {
     reconnect()
   }
   pulling.value = false
   pullDistance.value = 0
+
+  // Double-tap tespiti — çekme jestiyle karışmasın diye yalnızca parmak
+  // neredeyse hiç hareket etmediyse sayılır.
+  if (pulled < 10) {
+    const now = Date.now()
+    if (now - lastTapAt < DOUBLE_TAP_MS) {
+      lastTapAt = 0
+      suppressDblclickUntil = now + 500
+      toggleFullscreen()
+    } else {
+      lastTapAt = now
+    }
+  }
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  // Anchor'ın DOM'a eklenmesi gerekiyor — bazı tarayıcılar/otomasyon
+  // ortamları detached bir elemanda click()'i indirme olarak saymıyor.
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  // revoke'u hemen çağırmak, indirme henüz blob'u okumaya başlamadan
+  // URL'yi geçersiz kılabilir; bir sonraki tick'e erteliyoruz.
+  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 function downloadSnapshot(): void {
@@ -142,18 +195,18 @@ function downloadSnapshot(): void {
   canvas.toBlob(
     (blob) => {
       if (!blob) return
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `visionguard-${Date.now()}.jpg`
-      // Anchor'ın DOM'a eklenmesi gerekiyor — bazı tarayıcılar/otomasyon
-      // ortamları detached bir elemanda click()'i indirme olarak saymıyor.
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      // revoke'u hemen çağırmak, indirme henüz blob'u okumaya başlamadan
-      // URL'yi geçersiz kılabilir; bir sonraki tick'e erteliyoruz.
-      setTimeout(() => URL.revokeObjectURL(url), 0)
+      const filename = `visionguard-${Date.now()}.jpg`
+      const file = new File([blob], filename, { type: 'image/jpeg' })
+      // Telefonda native paylaşım menüsü (Fotoğraflar'a kaydet, mesajla gönder
+      // vb.) indirmeye göre çok daha doğal — a.download iOS standalone
+      // PWA'larda ayrıca güvenilmez. Desteklenmeyen yerde indirmeye düşülür.
+      if (navigator.canShare?.({ files: [file] })) {
+        navigator.share({ files: [file] }).catch(() => {
+          // Kullanıcı paylaşım menüsünü iptal etti — sessizce yut.
+        })
+      } else {
+        downloadBlob(blob, filename)
+      }
     },
     'image/jpeg',
     0.92,
@@ -209,13 +262,14 @@ function downloadSnapshot(): void {
       @touchstart="onTouchStart"
       @touchmove="onTouchMove"
       @touchend="onTouchEnd"
-      @dblclick="toggleFullscreen"
+      @dblclick="onDblclick"
     >
       <img
         v-if="streamActive"
         ref="streamImg"
         :src="streamUrl"
         alt="Canlı yayın"
+        draggable="false"
         class="max-h-full max-w-full object-contain"
         :class="isFullscreen ? 'rounded-none' : 'rounded-2xl'"
         @error="onStreamError"

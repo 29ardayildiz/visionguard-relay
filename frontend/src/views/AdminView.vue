@@ -63,7 +63,11 @@ function goViewer(): void {
 
 async function commitSetting<K extends keyof CameraSettings>(key: K, value: CameraSettings[K]): Promise<void> {
   const ok = await camera.setSetting(key, value)
-  toast.show(ok ? `${key} = ${value}` : `${key} güncellenemedi`, ok ? 'ok' : 'err')
+  // Native ayar panelleri (iOS Ayarlar gibi) başarıyı sessiz kabul eder —
+  // her slider/toggle değişiminde onay toast'ı görsel gürültü yaratıyordu.
+  // Yalnızca hata bildirilir; Preset/Sync/Reset/Apply All gibi açık buton
+  // aksiyonları kendi onay toast'larını korur.
+  if (!ok) toast.show(`${key} güncellenemedi`, 'err')
 }
 
 function toggleValue<K extends keyof CameraSettings>(key: K, checked: boolean): void {
