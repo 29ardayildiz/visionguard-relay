@@ -1,19 +1,15 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from ..core import config
 from ..core.security import check_brute_force, create_token, pwd_context, record_failed_attempt
 
 router = APIRouter()
-templates = Jinja2Templates(directory="templates")
 
 
-@router.get("/login")
-async def login_page(request: Request, error: int = 0):
-    return templates.TemplateResponse(request, "login.html", {"error": error})
-
-
+# GET /login artık backend'de yok — frontend/dist SPA fallback'i (app.py)
+# bu path'i Vue Router'ın LoginView'ine yönlendiriyor. Sadece form submit
+# (POST) burada kalıyor.
 @router.post("/login")
 async def login(
     request: Request,

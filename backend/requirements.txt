@@ -1,7 +1,5 @@
 fastapi
 uvicorn[standard]
-jinja2
-aiofiles
 websockets
 python-multipart
 python-dotenv
@@ -9,4 +7,3 @@ python-jose[cryptography]
 passlib[bcrypt]
 bcrypt==4.0.1
 slowapi
-Pillow

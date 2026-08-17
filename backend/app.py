@@ -1,8 +1,11 @@
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import Scope
 
-from .routers import auth, camera, client_ws, pages, pwa, stream
+from .routers import auth, camera, client_ws, stream
 
 # ── App ───────────────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address)
@@ -18,20 +21,41 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    if request.url.path not in ("/login", "/manifest.json", "/icon.png"):
+    # Vite'ın içerik-hash'li /assets/* dosyaları güvenle sonsuza kadar
+    # cache'lenebilir (dosya adı değişmeden içerik değişmez). Diğer her şey
+    # (index.html, API yanıtları) no-store kalır — özellikle login/admin
+    # gibi hassas sayfaların tarayıcıda önbelleklenmemesi için.
+    if not request.url.path.startswith("/assets/"):
         response.headers["Cache-Control"] = "no-store"
     return response
 
 
-# ── Routers ───────────────────────────────────────────────────────────────────
+# ── Routers (ESP32 kontratı dahil — path sırası önemli değil, hepsi statik
+# mount'tan ÖNCE include edilmiş olması yeterli) ───────────────────────────────
 app.include_router(auth.router)
-app.include_router(pages.router)
 app.include_router(stream.router)
 app.include_router(camera.router)
 app.include_router(client_ws.router)
-app.include_router(pwa.router)
 
-# NOT (Faz 7 — Cutover): frontend/dist statik mount'u burada, tüm router
-# include'larından SONRA eklenecek (CLAUDE.md §3, §6.3):
-#   app.mount("/", StaticFiles(directory="frontend/dist", html=True))
-# O zamana kadar pages.router yukarıdaki Jinja2 sayfalarını serve eder.
+
+class SPAStaticFiles(StaticFiles):
+    """StaticFiles + SPA fallback: bilinmeyen bir path (ör. /admin'e doğrudan
+    girmek/sayfa yenilemek) 404 yerine index.html'e düşer, Vue Router
+    client-side devralır. Düz `StaticFiles(html=True)` bunu yapmaz — sadece
+    "/" ve dizin path'lerinde index.html sunar. Starlette, dosya bulunamayınca
+    bir Response değil HTTPException(404) fırlatıyor — bu yüzden except ile
+    yakalayıp index.html'e düşüyoruz."""
+
+    async def get_response(self, path: str, scope: Scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404:
+                return await super().get_response("index.html", scope)
+            raise
+
+
+# Statik mount tüm API router'larından SONRA eklenir (CLAUDE.md §3, §6.3) —
+# aksi halde /api/*, /ws, /ws/client, /stream, /push gibi path'ler bu
+# fallback tarafından gölgelenir.
+app.mount("/", SPAStaticFiles(directory="frontend/dist", html=True), name="spa")
