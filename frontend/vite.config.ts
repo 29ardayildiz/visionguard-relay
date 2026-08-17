@@ -31,11 +31,30 @@ export default defineConfig({
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
           { src: 'maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        // İkona uzun basınca çıkan hızlı erişim menüsü (Android/masaüstü).
+        shortcuts: [
+          {
+            name: 'Canlı Yayın',
+            short_name: 'Canlı',
+            url: '/',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Kamera Ayarları',
+            short_name: 'Ayarlar',
+            url: '/admin',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
       },
       // Faz 8'de Lighthouse ile gözden geçirilecek; şimdilik tüm build
       // çıktısı (app-shell) precache ediliyor — MASTER.md §12: "anında açılış".
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        // Splash görsellerini iOS, service worker devrede olmadan launch
+        // sırasında doğrudan çeker — precache'e katmak app-shell'i ~300KB
+        // şişirmekten başka işe yaramaz.
+        globIgnores: ['**/apple-splash-*.png'],
       },
     }),
   ],

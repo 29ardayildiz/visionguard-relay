@@ -114,7 +114,11 @@ async function onApplyAll(): Promise<void> {
     <!-- Üst bar -->
     <header
       class="z-20 flex shrink-0 items-center justify-between border-b border-guard-border bg-guard-bg/90 px-4 py-3 backdrop-blur-md"
-      :style="{ paddingTop: 'calc(var(--sat) + 0.75rem)' }"
+      :style="{
+        paddingTop: 'calc(var(--sat) + 0.75rem)',
+        paddingLeft: 'calc(var(--sal) + 1rem)',
+        paddingRight: 'calc(var(--sar) + 1rem)',
+      }"
     >
       <button
         type="button"
@@ -346,7 +350,11 @@ async function onApplyAll(): Promise<void> {
     <!-- Alt sabit aksiyon barı -->
     <footer
       class="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-2 border-t border-guard-border bg-guard-bg/90 px-4 py-3 backdrop-blur-md"
-      :style="{ paddingBottom: 'calc(var(--sab) + 0.75rem)' }"
+      :style="{
+        paddingBottom: 'calc(var(--sab) + 0.75rem)',
+        paddingLeft: 'calc(var(--sal) + 1rem)',
+        paddingRight: 'calc(var(--sar) + 1rem)',
+      }"
     >
       <div class="flex gap-2">
         <button

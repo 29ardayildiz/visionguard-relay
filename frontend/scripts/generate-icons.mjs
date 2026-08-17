@@ -28,3 +28,31 @@ for (const task of tasks) {
   await sharp(srcPath, { density: 384 }).resize(task.size, task.size).png().toFile(outPath)
   console.log(`generated ${task.out} (${task.size}x${task.size}) from ${task.src}`)
 }
+
+// ── iOS splash screen'leri (apple-touch-startup-image) ──────────────────────
+// iOS, PWA açılışında bu görselleri piksel-hassas media query'lerle eşler
+// (index.html'deki link etiketleri). Koyu OLED zemin + ortalanmış marka ikonu.
+// Kapsanan cihazlar (portrait): iPhone SE/8, 14/13/12, 15/14 Pro, Pro Max.
+const SPLASH_BG = '#090a0a'
+const splashes = [
+  { w: 750, h: 1334 },  // 375x667 @2x — iPhone SE3 / 8
+  { w: 1170, h: 2532 }, // 390x844 @3x — iPhone 14 / 13 / 12
+  { w: 1179, h: 2556 }, // 393x852 @3x — iPhone 15 / 14 Pro
+  { w: 1290, h: 2796 }, // 430x932 @3x — iPhone 15 Plus / Pro Max
+]
+
+for (const { w, h } of splashes) {
+  const iconSize = Math.round(w * 0.3)
+  const icon = await sharp(join(ICONS_SRC, 'app-icon.svg'), { density: 384 })
+    .resize(iconSize, iconSize)
+    .png()
+    .toBuffer()
+  const out = `apple-splash-${w}x${h}.png`
+  await sharp({
+    create: { width: w, height: h, channels: 4, background: SPLASH_BG },
+  })
+    .composite([{ input: icon, gravity: 'center' }])
+    .png()
+    .toFile(join(PUBLIC_DIR, out))
+  console.log(`generated ${out}`)
+}

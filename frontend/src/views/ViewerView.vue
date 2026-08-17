@@ -253,7 +253,11 @@ function downloadSnapshot(): void {
     <!-- Üst durum katmanı -->
     <header
       class="fixed inset-x-0 top-0 z-20 flex items-center justify-between p-4"
-      :style="{ paddingTop: 'calc(var(--sat) + 1rem)' }"
+      :style="{
+        paddingTop: 'calc(var(--sat) + 1rem)',
+        paddingLeft: 'calc(var(--sal) + 1rem)',
+        paddingRight: 'calc(var(--sar) + 1rem)',
+      }"
     >
       <div
         class="flex items-center gap-2 rounded-full border border-guard-border bg-guard-surface/80 px-3 py-1.5 text-xs text-guard-secondary backdrop-blur-md"
@@ -263,7 +267,13 @@ function downloadSnapshot(): void {
           :class="[statusMeta.dotClass, connection.status === 'live' && 'animate-pulse']"
         />
         <span>{{ statusMeta.label }}</span>
-        <span v-if="connection.status === 'live'" class="font-mono text-guard-primary tabular-nums">
+        <!-- fps > 0 koşulu: ESP32 bağlı ama henüz kare akmıyorken (ilk
+        bağlanma anı, ya da bağlı-ama-sessiz kenar durumu) "0.0 FPS" gibi
+        tuhaf bir gösterge yerine yalnızca durum etiketi görünür. -->
+        <span
+          v-if="connection.status === 'live' && connection.fps > 0"
+          class="font-mono text-guard-primary tabular-nums"
+        >
           {{ connection.fps.toFixed(1) }} FPS
         </span>
       </div>
@@ -322,7 +332,11 @@ function downloadSnapshot(): void {
     <footer
       v-if="!isFullscreen"
       class="fixed inset-x-0 bottom-0 z-20 flex justify-center p-4"
-      :style="{ paddingBottom: 'calc(var(--sab) + 1rem)' }"
+      :style="{
+        paddingBottom: 'calc(var(--sab) + 1rem)',
+        paddingLeft: 'calc(var(--sal) + 1rem)',
+        paddingRight: 'calc(var(--sar) + 1rem)',
+      }"
     >
       <div
         class="flex items-center gap-1 rounded-full border border-guard-border bg-guard-surface/80 p-1.5 backdrop-blur-md"
