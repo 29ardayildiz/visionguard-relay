@@ -134,6 +134,22 @@ input[type='range']::-moz-range-thumb {
   cursor: pointer;
 }
 
+input[type='range']:focus-visible {
+  outline: none;
+}
+
+input[type='range']:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-brand-accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgb(16 185 129 / 0.3), 0 2px 6px rgb(0 0 0 / 0.4);
+}
+
+input[type='range']:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--color-brand-accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgb(16 185 129 / 0.3), 0 2px 6px rgb(0 0 0 / 0.4);
+}
+
 /* ── Hatalı giriş geri bildirimi (MASTER.md §11.1) ────────────────────────── */
 @keyframes shake {
   10%,
@@ -207,3 +223,96 @@ input[type='range']::-moz-range-thumb {
   opacity: 0;
   transform: translateY(8px);
 }
+
+/* ── Klavye Odaklanma Göstergeleri (:focus-visible) ─────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* ── Kaydırılabilir Alanlar İçin Touch-Action Stratejisi ───────────────── */
+.overflow-y-auto,
+.overflow-x-auto {
+  touch-action: pan-y;
+}
+
+/* ── Dokunmatik cihazlarda scrollbar gizle ────────────────────────────────
+   Native uygulamalarda kalıcı scrollbar yoktur; mouse'lu (hover destekli)
+   cihazlarda ise yön/konum bilgisi için scrollbar korunur. */
+@media (hover: none) {
+  .overflow-y-auto,
+  .overflow-x-auto {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;
+  }
+
+  .overflow-y-auto::-webkit-scrollbar,
+  .overflow-x-auto::-webkit-scrollbar {
+    display: none; /* WebKit/Blink */
+  }
+}
+
+/* ── Tam ekran dijital zoom: yalnızca double-tap zoom'da animasyon ────────
+   (pinch/pan sırasında bu sınıf kaldırılır — parmak takibi anlık olmalı) */
+.zoom-animated {
+  transition: transform 0.25s ease;
+}
+
+/* ── Erişilebilirlik: Tercih Edilen Azaltılmış Hareket (prefers-reduced-motion) ─ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .page-enter-active,
+  .page-leave-active,
+  .page-back-enter-active,
+  .page-back-leave-active,
+  .toast-enter-active,
+  .toast-leave-active {
+    transition: opacity 0.01ms !important;
+    transform: none !important;
+  }
+
+  .animate-spin-slow,
+  .animate-shake,
+  .animate-pulse {
+    animation: none !important;
+  }
+}
+
+/* ── Erişilebilirlik: Azaltılmış Saydamlık (prefers-reduced-transparency) ── */
+@media (prefers-reduced-transparency: reduce) {
+  .backdrop-blur-md,
+  .backdrop-blur-sm,
+  .backdrop-blur-lg {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  header,
+  footer,
+  .bg-guard-surface\/80,
+  .bg-guard-bg\/90 {
+    background-color: var(--color-guard-surface) !important;
+  }
+}
+
+/* ── Erişilebilirlik: Zorunlu Renkler / Yüksek Karşıtlık (forced-colors) ── */
+@media (forced-colors: active) {
+  button,
+  input,
+  select {
+    border: 1px solid ButtonText !important;
+  }
+
+  .border-guard-border {
+    border-color: ButtonBorder !important;
+  }
+}
+

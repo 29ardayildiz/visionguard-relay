@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
+import { onBroadcast } from '../lib/broadcast'
 import { WsClient, type ConnectionStatus } from '../lib/ws-client'
 
 type Unsubscribe = () => void
@@ -33,6 +34,13 @@ export const useConnectionStore = defineStore('connection', () => {
   function installLifecycleListeners(): void {
     if (lifecycleInstalled) return
     lifecycleInstalled = true
+
+    onBroadcast((msg) => {
+      if (msg.type === 'logout') {
+        stop()
+        window.location.href = '/login'
+      }
+    })
 
     // Arka plana geçişte bağlantıyı BİLİNÇLİ kapatıyoruz, dönüşte taze
     // bağlantı kuruyoruz. Bu, iOS'un dondurup close event'i vermeden zombie

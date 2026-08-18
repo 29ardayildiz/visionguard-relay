@@ -6,7 +6,12 @@ const toast = useToastStore()
 
 <template>
   <Transition name="toast">
-    <div v-if="toast.visible" class="fixed inset-x-0 bottom-24 z-40 flex justify-center px-4">
+    <div
+      v-if="toast.visible"
+      role="status"
+      aria-live="polite"
+      class="fixed inset-x-0 bottom-24 z-40 flex justify-center px-4"
+    >
       <div
         class="selectable rounded-xl border px-4 py-2.5 text-sm font-medium backdrop-blur-md"
         :class="

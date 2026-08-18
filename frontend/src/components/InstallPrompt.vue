@@ -27,6 +27,8 @@ function onInstallClick(): void {
   <Transition name="toast">
     <div
       v-if="visible"
+      role="region"
+      aria-label="Uygulama Yükleme Bildirimi"
       class="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4"
       :style="{ paddingBottom: 'calc(var(--sab) + 1rem)' }"
     >
@@ -44,6 +46,7 @@ function onInstallClick(): void {
         <button
           v-if="install.canPromptInstall"
           type="button"
+          aria-label="Ana Ekrana Ekle"
           class="shrink-0 min-h-11 rounded-lg bg-brand px-4 text-sm font-bold text-guard-bg transition-colors hover:bg-brand-hover active:scale-95"
           @click="onInstallClick"
         >
@@ -51,6 +54,7 @@ function onInstallClick(): void {
         </button>
         <button
           type="button"
+          aria-label="Bildirimi Kapat"
           class="shrink-0 min-h-11 rounded-lg px-3 text-sm text-guard-secondary transition-all active:scale-95 hover:text-guard-primary"
           @click="install.dismiss"
         >

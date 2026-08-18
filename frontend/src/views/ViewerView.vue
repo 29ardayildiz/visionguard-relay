@@ -7,9 +7,8 @@ import cameraOfflineUrl from '../icons/status/camera-offline.svg'
 import actionLogoutSvg from '../icons/actions/action-logout.svg?raw'
 import actionSettingsSvg from '../icons/actions/action-settings.svg?raw'
 import loaderWakingUrl from '../icons/status/loader-waking.svg'
+import { sendBroadcast } from '../lib/broadcast'
 import { useConnectionStore } from '../stores/connection'
-
-const PULL_THRESHOLD = 70
 
 const router = useRouter()
 const connection = useConnectionStore()
@@ -26,9 +25,35 @@ let streamRetryTimer: ReturnType<typeof setTimeout> | null = null
 // <img> DOM'dan kalkınca tarayıcı MJPEG bağlantısını kapatır (pil + veri).
 const streamActive = computed(() => connection.status === 'live' && connection.appVisible)
 
-const pulling = ref(false)
-const pullDistance = ref(0)
-let touchStartY = 0
+// ── Tam ekranda dijital zoom durumu ─────────────────────────────────────────
+// transform sırası `translate(tx,ty) scale(s)` — translate ekran pikselinde
+// uygulanır (soldaki dönüşüm parent koordinatında çalışır), pan matematiği
+// scale'den bağımsız kalır.
+const ZOOM_MIN = 1
+const ZOOM_MAX = 4
+const zoomScale = ref(1)
+const zoomTx = ref(0)
+const zoomTy = ref(0)
+// Double-tap zoom'da yumuşak geçiş; pinch/pan sırasında transition kapalı
+// olmalı yoksa parmak takibi lastikli/gecikmeli hissettirir.
+const zoomAnimated = ref(false)
+const isZoomed = computed(() => zoomScale.value > 1.01)
+
+type Gesture = 'none' | 'pan' | 'pinch'
+let gesture: Gesture = 'none'
+let pinchStartDist = 0
+let pinchStartScale = 1
+let pinchStartTx = 0
+let pinchStartTy = 0
+let pinchFocalX = 0
+let pinchFocalY = 0
+let panStartX = 0
+let panStartY = 0
+let panStartTx = 0
+let panStartTy = 0
+let tapStartX = 0
+let tapStartY = 0
+let tapMoved = false
 
 const statusMeta = computed(() => {
   if (!connection.networkOnline) {
@@ -131,6 +156,7 @@ async function logout(): Promise<void> {
   // yeniden başlatıp kısa bir boş-ekran flaşı yaratıyordu. Cookie'yi fetch ile
   // sildirip route geçişini animasyonlu şekilde router'a bırakıyoruz.
   connection.stop()
+  sendBroadcast({ type: 'logout' })
   try {
     await fetch('/logout', { redirect: 'manual' })
   } catch {
@@ -140,62 +166,198 @@ async function logout(): Promise<void> {
   router.replace({ name: 'login' })
 }
 
-function toggleFullscreen(): void {
+function setFullscreen(value: boolean): void {
   vibrate()
-  isFullscreen.value = !isFullscreen.value
+  if (!value) resetZoom(false)
+  if ('startViewTransition' in document && typeof document.startViewTransition === 'function') {
+    document.startViewTransition(() => {
+      isFullscreen.value = value
+    })
+  } else {
+    isFullscreen.value = value
+  }
 }
 
-// Mobilde dblclick event'i gecikmeli/tutarsız — kendi double-tap algılayıcımız:
-// iki touchend arası < 300ms ve arada çekme jesti yoksa tam ekran toggle.
-// Ardından tarayıcının üretebileceği sentetik dblclick'i kısa süre bastırıyoruz
-// ki toggle iki kez çalışıp eski durumuna geri dönmesin.
+function toggleFullscreen(): void {
+  setFullscreen(!isFullscreen.value)
+}
+
+function exitFullscreen(): void {
+  setFullscreen(false)
+}
+
+function resetZoom(animated: boolean): void {
+  zoomAnimated.value = animated
+  zoomScale.value = 1
+  zoomTx.value = 0
+  zoomTy.value = 0
+}
+
+// Pan sınırı: görüntü kenarı ekran kenarının içine "kaçamaz". Ölçeklenmiş
+// görüntü konteynerden küçükse eksen için sınır 0'dır (ortalanmış kalır).
+function clampPan(): void {
+  const img = streamImg.value
+  const container = img?.parentElement
+  const s = zoomScale.value
+  if (!img || !container || s <= 1) {
+    zoomTx.value = 0
+    zoomTy.value = 0
+    return
+  }
+  const maxTx = Math.max(0, (img.clientWidth * s - container.clientWidth) / 2)
+  const maxTy = Math.max(0, (img.clientHeight * s - container.clientHeight) / 2)
+  zoomTx.value = Math.min(maxTx, Math.max(-maxTx, zoomTx.value))
+  zoomTy.value = Math.min(maxTy, Math.max(-maxTy, zoomTy.value))
+}
+
+function touchDistance(event: TouchEvent): number {
+  const a = event.touches[0]!
+  const b = event.touches[1]!
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+}
+
+// Konteyner merkezine göre nokta (transform-origin center olduğu için tüm
+// odak-noktalı zoom matematiği bu koordinatta yürür).
+function pointFromCenter(clientX: number, clientY: number): { x: number; y: number } {
+  const rect = streamImg.value?.parentElement?.getBoundingClientRect()
+  if (!rect) return { x: 0, y: 0 }
+  return { x: clientX - (rect.left + rect.width / 2), y: clientY - (rect.top + rect.height / 2) }
+}
+
+// Mobilde dblclick event'i gecikmeli/tutarsız — kendi double-tap algılayıcımız.
+// Normal modda tam ekrana girer; tam ekranda dijital zoom'u aç/kapatır
+// (native video oynatıcı davranışı). Tam ekrandan çıkış YALNIZCA ✕ butonuyla.
+// Tarayıcının üretebileceği sentetik dblclick'i kısa süre bastırıyoruz.
 const DOUBLE_TAP_MS = 300
 let lastTapAt = 0
 let suppressDblclickUntil = 0
 
-function onDblclick(): void {
-  if (Date.now() < suppressDblclickUntil) return
-  toggleFullscreen()
+function handleDoubleTap(clientX: number, clientY: number): void {
+  if (!isFullscreen.value) {
+    setFullscreen(true)
+    return
+  }
+  vibrate()
+  if (isZoomed.value) {
+    resetZoom(true)
+  } else {
+    // Dokunulan noktayı merkeze taşıyarak 2x zoom: s0=1, t0=0 için
+    // t1 = f - s1*f = -f (odak-noktası formülünün özel hali).
+    const focal = pointFromCenter(clientX, clientY)
+    zoomAnimated.value = true
+    zoomScale.value = 2
+    zoomTx.value = -focal.x
+    zoomTy.value = -focal.y
+    clampPan()
+  }
 }
 
-function reconnect(): void {
-  vibrate()
-  connection.reconnectNow()
-  streamCacheBust.value = Date.now()
+function onDblclick(event: MouseEvent): void {
+  if (Date.now() < suppressDblclickUntil) return
+  handleDoubleTap(event.clientX, event.clientY)
 }
 
 function onTouchStart(event: TouchEvent): void {
-  if (window.scrollY > 0) return
-  touchStartY = event.touches[0]!.clientY
-  pulling.value = true
+  if (isFullscreen.value && event.touches.length === 2) {
+    gesture = 'pinch'
+    zoomAnimated.value = false
+    tapMoved = true
+    pinchStartDist = touchDistance(event)
+    pinchStartScale = zoomScale.value
+    pinchStartTx = zoomTx.value
+    pinchStartTy = zoomTy.value
+    const a = event.touches[0]!
+    const b = event.touches[1]!
+    const focal = pointFromCenter((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2)
+    pinchFocalX = focal.x
+    pinchFocalY = focal.y
+    return
+  }
+  if (event.touches.length !== 1) return
+  const touch = event.touches[0]!
+  if (isFullscreen.value && isZoomed.value) {
+    gesture = 'pan'
+    zoomAnimated.value = false
+    panStartX = touch.clientX
+    panStartY = touch.clientY
+    panStartTx = zoomTx.value
+    panStartTy = zoomTy.value
+  } else {
+    gesture = 'none'
+  }
+  tapStartX = touch.clientX
+  tapStartY = touch.clientY
+  tapMoved = false
 }
 
 function onTouchMove(event: TouchEvent): void {
-  if (!pulling.value) return
-  const delta = event.touches[0]!.clientY - touchStartY
-  if (delta > 0) pullDistance.value = Math.min(delta, 120)
+  if (gesture === 'pinch' && event.touches.length >= 2) {
+    event.preventDefault()
+    const scale = Math.min(
+      ZOOM_MAX,
+      Math.max(ZOOM_MIN, pinchStartScale * (touchDistance(event) / pinchStartDist)),
+    )
+    // Odak-noktalı zoom: parmakların ortasındaki görüntü noktası ekranda sabit
+    // kalır — t1 = f - (s1/s0) * (f - t0).
+    const ratio = scale / pinchStartScale
+    zoomScale.value = scale
+    zoomTx.value = pinchFocalX - ratio * (pinchFocalX - pinchStartTx)
+    zoomTy.value = pinchFocalY - ratio * (pinchFocalY - pinchStartTy)
+    clampPan()
+    return
+  }
+  if (gesture === 'pan' && event.touches.length === 1) {
+    event.preventDefault()
+    const touch = event.touches[0]!
+    zoomTx.value = panStartTx + (touch.clientX - panStartX)
+    zoomTy.value = panStartTy + (touch.clientY - panStartY)
+    clampPan()
+    // Pan yapılan parmak kalkınca double-tap sayılmasın.
+    if (Math.hypot(touch.clientX - tapStartX, touch.clientY - tapStartY) > 10) tapMoved = true
+    return
+  }
+  if (event.touches.length === 1) {
+    const touch = event.touches[0]!
+    if (Math.hypot(touch.clientX - tapStartX, touch.clientY - tapStartY) > 10) tapMoved = true
+  }
 }
 
-function onTouchEnd(): void {
-  const pulled = pullDistance.value
-  if (pulling.value && pulled > PULL_THRESHOLD) {
-    reconnect()
-  }
-  pulling.value = false
-  pullDistance.value = 0
-
-  // Double-tap tespiti — çekme jestiyle karışmasın diye yalnızca parmak
-  // neredeyse hiç hareket etmediyse sayılır.
-  if (pulled < 10) {
-    const now = Date.now()
-    if (now - lastTapAt < DOUBLE_TAP_MS) {
-      lastTapAt = 0
-      suppressDblclickUntil = now + 500
-      toggleFullscreen()
-    } else {
-      lastTapAt = now
+function onTouchEnd(event: TouchEvent): void {
+  if (gesture === 'pinch') {
+    if (event.touches.length === 1) {
+      // Bir parmak kalktı — kalan parmakla kesintisiz pan'a geç.
+      const touch = event.touches[0]!
+      gesture = 'pan'
+      panStartX = touch.clientX
+      panStartY = touch.clientY
+      panStartTx = zoomTx.value
+      panStartTy = zoomTy.value
+      return
     }
+    gesture = 'none'
+    // 1x'e çok yakın bırakıldıysa tam 1x'e oturt (yamuk yarım-zoom kalmasın).
+    if (zoomScale.value < 1.05) resetZoom(true)
+    return
   }
+  if (gesture === 'pan') {
+    if (event.touches.length === 0) gesture = 'none'
+    return
+  }
+  if (event.touches.length > 0 || tapMoved) return
+
+  const now = Date.now()
+  if (now - lastTapAt < DOUBLE_TAP_MS) {
+    lastTapAt = 0
+    suppressDblclickUntil = now + 500
+    const touch = event.changedTouches[0]
+    handleDoubleTap(touch?.clientX ?? tapStartX, touch?.clientY ?? tapStartY)
+  } else {
+    lastTapAt = now
+  }
+}
+
+function onTouchCancel(): void {
+  gesture = 'none'
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -257,6 +419,8 @@ function downloadSnapshot(): void {
       }"
     >
       <div
+        role="status"
+        aria-live="polite"
         class="flex min-w-0 items-center gap-2 rounded-full border border-guard-border bg-guard-surface/80 px-3 py-1.5 text-sm text-guard-secondary backdrop-blur-md"
       >
         <span
@@ -277,6 +441,7 @@ function downloadSnapshot(): void {
 
       <button
         type="button"
+        aria-label="Kamera Ayarları"
         class="flex h-11 w-11 items-center justify-center rounded-full border border-guard-border bg-guard-surface/80 text-guard-secondary backdrop-blur-md transition-colors hover:text-brand active:scale-95"
         @click="goAdmin"
       >
@@ -284,34 +449,31 @@ function downloadSnapshot(): void {
       </button>
     </header>
 
-    <!-- Pull-to-reconnect göstergesi -->
-    <div
-      v-if="pullDistance > 0"
-      class="fixed inset-x-0 top-0 z-10 flex justify-center text-xs text-guard-secondary"
-      :style="{ paddingTop: `calc(var(--sat) + ${pullDistance}px)`, opacity: Math.min(pullDistance / PULL_THRESHOLD, 1) }"
-    >
-      {{ pullDistance > PULL_THRESHOLD ? 'Bırakınca yenilenir' : 'Yenilemek için çekin' }}
-    </div>
-
     <!-- Stream alanı -->
     <div
       :class="[
-        'flex h-full items-center justify-center overflow-hidden',
-        isFullscreen ? 'fixed inset-0 z-30 bg-black' : 'p-4',
+        'flex h-full items-center justify-center overflow-hidden select-none',
+        isFullscreen ? 'fixed inset-0 z-30 touch-none bg-black' : 'p-4',
       ]"
       @touchstart="onTouchStart"
       @touchmove="onTouchMove"
       @touchend="onTouchEnd"
+      @touchcancel="onTouchCancel"
       @dblclick="onDblclick"
     >
       <img
         v-if="streamActive"
         ref="streamImg"
         :src="streamUrl"
-        alt="Canlı yayın"
+        alt="Canlı kamera görüntüsü"
         draggable="false"
         class="max-h-full max-w-full object-contain"
-        :class="isFullscreen ? 'rounded-none' : 'rounded-2xl'"
+        :class="[isFullscreen ? 'rounded-none' : 'rounded-2xl', zoomAnimated && 'zoom-animated']"
+        :style="
+          isFullscreen
+            ? { transform: `translate(${zoomTx}px, ${zoomTy}px) scale(${zoomScale})` }
+            : undefined
+        "
         @error="onStreamError"
       />
       <div v-else class="flex flex-col items-center gap-3 px-4 text-center">
@@ -323,6 +485,19 @@ function downloadSnapshot(): void {
         />
         <p class="text-sm text-guard-secondary">{{ emptyStateMeta.text }}</p>
       </div>
+
+      <!-- Tam ekrandan çıkış — tek çıkış yolu bu buton (double-tap artık
+      zoom'a ayrıldı, native video oynatıcı deseni). -->
+      <button
+        v-if="isFullscreen"
+        type="button"
+        aria-label="Tam Ekrandan Çık"
+        class="fixed z-40 flex h-11 w-11 items-center justify-center rounded-full border border-guard-border bg-guard-surface/80 text-lg text-guard-secondary backdrop-blur-md transition-colors hover:text-guard-primary active:scale-95"
+        :style="{ top: 'calc(var(--sat) + 1rem)', right: 'calc(var(--sar) + 1rem)' }"
+        @click="exitFullscreen"
+      >
+        ✕
+      </button>
     </div>
 
     <!-- Alt aksiyon çubuğu -->
@@ -340,6 +515,7 @@ function downloadSnapshot(): void {
       >
         <button
           type="button"
+          aria-label="Oturumu Kapat"
           class="flex min-h-11 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95"
           @click="logout"
         >
@@ -348,6 +524,7 @@ function downloadSnapshot(): void {
         </button>
         <button
           type="button"
+          aria-label="Tam Ekran Yap"
           class="flex min-h-11 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95"
           @click="toggleFullscreen"
         >
@@ -355,6 +532,7 @@ function downloadSnapshot(): void {
         </button>
         <button
           type="button"
+          aria-label="Anlık Fotoğraf Kaydet"
           :disabled="connection.status !== 'live'"
           class="flex min-h-11 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-guard-secondary transition-colors hover:bg-guard-elevated hover:text-guard-primary active:scale-95 disabled:pointer-events-none disabled:opacity-40"
           @click="downloadSnapshot"

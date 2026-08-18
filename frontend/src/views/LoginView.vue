@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import appIconUrl from '../icons/pwa/app-icon.svg'
@@ -13,9 +13,28 @@ const loading = ref(false)
 const error = ref(false)
 const shaking = ref(false)
 
-function vibrate() {
+const DRAFT_USER_KEY = 'vg_draft_username'
+
+onMounted(() => {
+  const savedUser = sessionStorage.getItem(DRAFT_USER_KEY)
+  if (savedUser) username.value = savedUser
+})
+
+function onUsernameInput(): void {
+  sessionStorage.setItem(DRAFT_USER_KEY, username.value)
+}
+
+function vibrate(): void {
   if ('vibrate' in navigator) {
     navigator.vibrate(10)
+  }
+}
+
+function dismissKeyboard(event: MouseEvent): void {
+  if ((event.target as HTMLElement).tagName !== 'INPUT') {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
   }
 }
 
@@ -29,6 +48,7 @@ async function handleSubmit() {
   loading.value = false
 
   if (ok) {
+    sessionStorage.removeItem(DRAFT_USER_KEY)
     // push değil replace: giriş yapmış bir kullanıcının "geri" jestiyle
     // login formuna dönmesi istenmiyor — bu bir durum geçişi, drill-in değil.
     router.replace({ name: 'viewer' })
@@ -53,16 +73,18 @@ async function handleSubmit() {
       paddingLeft: 'calc(var(--sal) + 1rem)',
       paddingRight: 'calc(var(--sar) + 1rem)',
     }"
+    @click="dismissKeyboard"
   >
     <form
       :class="[
         'w-full max-w-sm rounded-2xl border border-guard-border bg-guard-surface/80 p-6 backdrop-blur-md sm:p-8',
         shaking && 'animate-shake',
       ]"
+      novalidate
       @submit.prevent="handleSubmit"
     >
       <div class="mb-6 flex flex-col items-center gap-2">
-        <img :src="appIconUrl" alt="VisionGuard" class="h-18 w-18" />
+        <img :src="appIconUrl" alt="VisionGuard Logo" class="h-18 w-18" />
         <h1 class="text-lg font-semibold text-guard-primary">VisionGuard</h1>
         <p class="text-xs text-guard-secondary">Güvenli Kamera Erişimi</p>
       </div>
@@ -73,11 +95,19 @@ async function handleSubmit() {
             id="username"
             v-model="username"
             type="text"
+            inputmode="text"
+            autocapitalize="none"
+            autocorrect="off"
+            spellcheck="false"
+            enterkeyhint="next"
             autocomplete="username"
             required
             autofocus
             placeholder=" "
+            :aria-invalid="error ? 'true' : 'false'"
+            aria-describedby="login-error"
             class="peer w-full rounded-lg border border-guard-border bg-guard-elevated px-4 pt-5 pb-2 text-base text-guard-primary outline-none focus:border-brand"
+            @input="onUsernameInput"
           />
           <label
             for="username"
@@ -92,9 +122,12 @@ async function handleSubmit() {
             id="password"
             v-model="password"
             type="password"
+            enterkeyhint="done"
             autocomplete="current-password"
             required
             placeholder=" "
+            :aria-invalid="error ? 'true' : 'false'"
+            aria-describedby="login-error"
             class="peer w-full rounded-lg border border-guard-border bg-guard-elevated px-4 pt-5 pb-2 text-base text-guard-primary outline-none focus:border-brand"
           />
           <label
@@ -108,6 +141,9 @@ async function handleSubmit() {
 
       <p
         v-if="error"
+        id="login-error"
+        role="alert"
+        aria-live="assertive"
         class="selectable mt-4 rounded-lg border border-status-offline/30 bg-status-offline/10 px-3 py-2 text-center text-sm text-status-offline"
       >
         Kullanıcı adı veya şifre hatalı.
@@ -123,3 +159,4 @@ async function handleSubmit() {
     </form>
   </main>
 </template>
+

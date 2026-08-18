@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 import AppIcon from '../components/AppIcon.vue'
@@ -43,9 +43,16 @@ const PRESETS = [
   { key: 'fixed_light', label: 'Fixed Light', icon: presetFixedLightSvg },
 ] as const
 
+function onKeyDown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    goViewer()
+  }
+}
+
 onMounted(async () => {
   // Auth kontrolü router guard'ında (render'dan önce) yapılıyor.
   connection.start()
+  window.addEventListener('keydown', onKeyDown)
   const ok = await camera.fetchSettings()
   if (!ok && !camera.loaded) {
       // Gerçek değerler alınamadı — paneli sonsuza dek soluk bırakmak yerine
@@ -53,6 +60,10 @@ onMounted(async () => {
     toast.show('Ayarlar yüklenemedi, varsayılanlar gösteriliyor', 'err')
     camera.loaded = true
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeyDown)
 })
 
 function vibrate(): void {
@@ -119,6 +130,7 @@ async function onApplyAll(): Promise<void> {
     >
       <button
         type="button"
+        aria-label="Canlı Yayına Geri Dön"
         class="-ml-2 min-h-11 rounded-lg px-3 text-sm text-guard-secondary transition-all active:scale-95 hover:text-guard-primary"
         @click="goViewer"
       >
@@ -140,7 +152,11 @@ async function onApplyAll(): Promise<void> {
     kaydırma jesti), bu yüzden scroll burada, kendi konteynerinde. -->
     <div
       class="flex-1 overflow-y-auto overscroll-contain"
-      :style="{ paddingLeft: 'var(--sal)', paddingRight: 'var(--sar)' }"
+      :style="{
+        paddingLeft: 'var(--sal)',
+        paddingRight: 'var(--sar)',
+        scrollPaddingBottom: 'calc(var(--sab) + 6.5rem)',
+      }"
     >
       <!-- Gerçek değerler backend'den gelene kadar panel soluk + etkileşimsiz:
       varsayılan -> gerçek değer "sıçraması" görünmez, yanlış değere dokunulamaz. -->

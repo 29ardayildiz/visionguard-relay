@@ -25,6 +25,8 @@ function onLater(): void {
   <Transition name="toast">
     <div
       v-if="showPrompt"
+      role="alertdialog"
+      aria-label="Yeni Sürüm Güncelleme Bildirimi"
       class="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4"
       :style="{ paddingBottom: 'calc(var(--sab) + 1rem)' }"
     >
@@ -41,6 +43,7 @@ function onLater(): void {
         <button
           type="button"
           :disabled="updating"
+          aria-label="Uygulamayı Güncelle"
           class="shrink-0 min-h-11 rounded-lg bg-brand px-4 text-sm font-bold text-guard-bg transition-all active:scale-95 hover:bg-brand-hover disabled:opacity-60"
           @click="onUpdate"
         >
@@ -48,6 +51,7 @@ function onLater(): void {
         </button>
         <button
           type="button"
+          aria-label="Güncellemeyi Sonraya Bırak"
           class="shrink-0 min-h-11 rounded-lg px-3 text-sm text-guard-secondary transition-all active:scale-95 hover:text-guard-primary"
           @click="onLater"
         >
