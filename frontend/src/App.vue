@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 
 import AppToast from './components/AppToast.vue'
 import InstallPrompt from './components/InstallPrompt.vue'
-import PwaUpdatePrompt from './components/PwaUpdatePrompt.vue'
 
 // Native push/pop hissi: hiyerarşide ileri giderken (login -> viewer -> admin)
 // sağdan-içeri, geri dönerken soldan-içeri kaydırma. Derinlik haritası route
@@ -29,5 +28,4 @@ router.afterEach((to, from) => {
   </RouterView>
   <AppToast />
   <InstallPrompt />
-  <PwaUpdatePrompt />
 </template>

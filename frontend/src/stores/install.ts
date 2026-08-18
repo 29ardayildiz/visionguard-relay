@@ -20,10 +20,15 @@ function isIOSDevice(): boolean {
   return /iphone|ipad|ipod/i.test(window.navigator.userAgent)
 }
 
+// iOS kartı her ziyarette (hasSeenLive beklemeden) gösterildiği için kapatma
+// tercihi oturumluk değil kalıcı olmalı — yoksa her açılışta yeniden çıkıp
+// nag'e dönüşür. Chromium tarafında da aynı kalıcılık zarar vermez.
+const DISMISSED_KEY = 'vg_install_dismissed'
+
 export const useInstallStore = defineStore('install', () => {
   const deferredEvent = ref<BeforeInstallPromptEvent | null>(null)
   const installed = ref(isStandaloneDisplay())
-  const dismissed = ref(false)
+  const dismissed = ref(localStorage.getItem(DISMISSED_KEY) === '1')
   let listening = false
 
   const isIOS = isIOSDevice()
@@ -57,6 +62,7 @@ export const useInstallStore = defineStore('install', () => {
 
   function dismiss(): void {
     dismissed.value = true
+    localStorage.setItem(DISMISSED_KEY, '1')
   }
 
   return { canPromptInstall, showIOSInstructions, canShowInstallCard, listen, promptInstall, dismiss }

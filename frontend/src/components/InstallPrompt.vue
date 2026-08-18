@@ -2,20 +2,20 @@
 import { computed } from 'vue'
 
 import appIconUrl from '../icons/pwa/app-icon.svg'
-import { usePwaUpdate } from '../composables/usePwaUpdate'
 import { useConnectionStore } from '../stores/connection'
 import { useInstallStore } from '../stores/install'
 
 const connection = useConnectionStore()
 const install = useInstallStore()
-// Destructure şart: usePwaUpdate düz obje döndürdüğü için showPrompt bir Ref —
-// `!pwaUpdate.showPrompt` yazılsaydı Ref objesi her zaman truthy olurdu.
-const { showPrompt: updatePromptVisible } = usePwaUpdate()
 
-// Güncelleme kartı öncelikli — ikisi de alt kenara sabitlendiği için aynı anda
-// gösterilmez; güncelleme kapatılınca/uygulanınca install kartı geri gelir.
+// iOS: programatik install imkânsız (beforeinstallprompt yok) — talimat kartı
+// ilk ziyaretten itibaren hemen gösterilir ki kullanıcı PWA'yı keşfedebilsin.
+// Chromium: native prompt elimizde, kart canlı yayın ilk izlendikten sonra
+// gösterilir (MASTER.md §12 — değer görülmeden install isteme).
 const visible = computed(
-  () => connection.hasSeenLive && install.canShowInstallCard && !updatePromptVisible.value,
+  () =>
+    install.canShowInstallCard &&
+    (install.showIOSInstructions || connection.hasSeenLive),
 )
 
 function onInstallClick(): void {

@@ -7,11 +7,15 @@ import cameraOfflineUrl from '../icons/status/camera-offline.svg'
 import actionLogoutSvg from '../icons/actions/action-logout.svg?raw'
 import actionSettingsSvg from '../icons/actions/action-settings.svg?raw'
 import loaderWakingUrl from '../icons/status/loader-waking.svg'
+import { usePwaUpdate } from '../composables/usePwaUpdate'
 import { sendBroadcast } from '../lib/broadcast'
 import { useConnectionStore } from '../stores/connection'
 
 const router = useRouter()
 const connection = useConnectionStore()
+// Destructure şart: usePwaUpdate düz obje döndürür (Pinia store değil) —
+// ref ancak top-level değişken olarak template'te unwrap edilir.
+const { updateAvailable } = usePwaUpdate()
 
 const STREAM_RETRY_MS = 3000
 
@@ -441,11 +445,18 @@ function downloadSnapshot(): void {
 
       <button
         type="button"
-        aria-label="Kamera Ayarları"
-        class="flex h-11 w-11 items-center justify-center rounded-full border border-guard-border bg-guard-surface/80 text-guard-secondary backdrop-blur-md transition-colors hover:text-brand active:scale-95"
+        :aria-label="updateAvailable ? 'Kamera Ayarları (yeni sürüm mevcut)' : 'Kamera Ayarları'"
+        class="relative flex h-11 w-11 items-center justify-center rounded-full border border-guard-border bg-guard-surface/80 text-guard-secondary backdrop-blur-md transition-colors hover:text-brand active:scale-95"
         @click="goAdmin"
       >
         <AppIcon :svg="actionSettingsSvg" class="h-5 w-5" />
+        <!-- Yeni sürüm badge'i: pop-up yerine sessiz nokta — güncelleme
+        Admin > Sürüm bölümünden elle yapılır. -->
+        <span
+          v-if="updateAvailable"
+          aria-hidden="true"
+          class="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-brand ring-2 ring-guard-bg"
+        />
       </button>
     </header>
 

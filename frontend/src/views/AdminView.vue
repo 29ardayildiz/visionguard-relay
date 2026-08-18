@@ -20,6 +20,7 @@ import presetHighFpsSvg from '../icons/presets/preset-high-fps.svg?raw'
 import presetHighQualitySvg from '../icons/presets/preset-high-quality.svg?raw'
 import presetNightModeSvg from '../icons/presets/preset-night-mode.svg?raw'
 
+import { usePwaUpdate } from '../composables/usePwaUpdate'
 import { APP_VERSION } from '../lib/version'
 import {
   FRAMESIZE_OPTIONS,
@@ -35,6 +36,14 @@ const router = useRouter()
 const connection = useConnectionStore()
 const camera = useCameraStore()
 const toast = useToastStore()
+// Destructure şart: usePwaUpdate düz obje döndürür (Pinia store değil) —
+// ref'ler ancak top-level değişken olarak template'te unwrap edilir.
+const { updateAvailable, updating, applyUpdate } = usePwaUpdate()
+
+function onApplyUpdate(): void {
+  if ('vibrate' in navigator) navigator.vibrate(10)
+  void applyUpdate()
+}
 
 const PRESETS = [
   { key: 'hq', label: 'High Quality', icon: presetHighQualitySvg },
@@ -357,8 +366,31 @@ async function onApplyAll(): Promise<void> {
         </div>
       </SettingsCard>
 
+      <!-- Sürüm bölümü: güncelleme buradan ELLE yapılır (pop-up yok, oto
+      güncelleme yok) — yeni sürüm işareti viewer'daki gear badge'i. -->
+      <div
+        v-if="updateAvailable"
+        class="flex items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-brand/10 p-4"
+      >
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-brand-accent">Yeni sürüm mevcut</p>
+          <p class="mt-0.5 text-xs text-guard-secondary">
+            Güncelleme uygulanırken sayfa bir kez yenilenir
+          </p>
+        </div>
+        <button
+          type="button"
+          :disabled="updating"
+          aria-label="Uygulamayı Güncelle"
+          class="min-h-11 shrink-0 rounded-lg bg-brand px-4 text-sm font-bold text-guard-bg transition-all hover:bg-brand-hover active:scale-95 disabled:opacity-60"
+          @click="onApplyUpdate"
+        >
+          {{ updating ? 'Güncelleniyor...' : 'Güncelle' }}
+        </button>
+      </div>
+
       <p class="selectable pt-1 text-center text-xs text-guard-muted">
-        VisionGuard · v{{ APP_VERSION }}
+        VisionGuard · v{{ APP_VERSION }}{{ updateAvailable ? '' : ' · Sürüm güncel' }}
       </p>
       </div>
     </div>

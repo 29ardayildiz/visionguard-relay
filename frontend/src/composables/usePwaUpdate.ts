@@ -1,12 +1,15 @@
 import { computed, ref, type Ref } from 'vue'
 import { useRegisterSW } from 'virtual:pwa-register/vue'
 
-// PWA güncelleme akışının tamamı bu composable'da yaşar; PwaUpdatePrompt.vue
-// sadece bunu tüketen ince bir UI katmanıdır.
+// PWA güncelleme akışının tamamı bu composable'da yaşar. UI tarafı pop-up
+// değildir: viewer'daki ayarlar (gear) ikonunda nokta badge + Admin sürüm
+// bölümünde "Yeni sürüm mevcut → Güncelle" satırı bu state'i tüketir.
 //
 // Tasarım kuralları:
 // - ASLA otomatik reload yok: yeni service worker "waiting" durumunda bekler,
 //   yalnızca kullanıcı "Güncelle"ye basınca (applyUpdate) aktive edilir.
+// - "Kapat/Sonra" kavramı yok: badge, kullanıcı güncelleyene kadar sessizce
+//   görünür kalır — akışı kesen bir kart olmadığı için ertelemeye gerek yok.
 // - Modül seviyesi singleton: useRegisterSW her çağrıldığında yeni bir SW
 //   kaydı başlattığı ve listener/interval'ların bir kez kurulması gerektiği
 //   için, tüm state modül kapsamında bir kez oluşturulur — composable kaç
@@ -31,7 +34,6 @@ let swRegistration: ServiceWorkerRegistration | undefined
 let lastCheckAt = 0
 let intervalTimer: ReturnType<typeof setInterval> | null = null
 
-const dismissed = ref(false)
 const updating = ref(false)
 
 async function checkForUpdate(reason: UpdateCheckReason, force = false): Promise<void> {
@@ -86,7 +88,7 @@ function ensureInitialized(): PwaUpdateState {
 export function usePwaUpdate() {
   const s = ensureInitialized()
 
-  const showPrompt = computed(() => s.needRefresh.value && !dismissed.value)
+  const updateAvailable = computed(() => s.needRefresh.value)
 
   async function applyUpdate(): Promise<void> {
     if (updating.value) return
@@ -96,11 +98,5 @@ export function usePwaUpdate() {
     await s.updateServiceWorker(true)
   }
 
-  function dismiss(): void {
-    // Oturum boyunca gizli kalır; kullanıcı uygulamayı bir sonraki tam
-    // açışında (güncelleme hâlâ bekliyorsa) kartı tekrar görür.
-    dismissed.value = true
-  }
-
-  return { showPrompt, updating, applyUpdate, dismiss }
+  return { updateAvailable, updating, applyUpdate }
 }
