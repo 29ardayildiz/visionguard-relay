@@ -1,0 +1,54 @@
+name: Security Audit
+
+# Bilgilendirici mod (REMEDIATION_PLAN_LOG.md Faz 12, kullanıcı kararı): bulgu
+# çıksa bile bu workflow ASLA kırmızıya düşmez — yalnızca Actions log'unda
+# görünür. Tek geliştiricili bir hobi projesinde branch protection olmadan
+# "kırmızı X" fiilen hiçbir şeyi engellemiyor, sadece zamanla görmezden
+# gelinen bir gürültüye dönüşme riski taşıyor. Amaç engellemek değil, görünür
+# kılmak.
+#
+# İki tetikleyici birlikte: push/PR (yeni eklenen bir bağımlılığı hemen
+# yakalar) + haftalık zamanlanmış çalışma (kod hiç değişmese bile zaten kurulu
+# bir pakette yeni açıklanan bir CVE'yi yakalar — asıl gerçekçi tehdit modeli
+# bu, "az önce zafiyetli paket mi ekledim" değil).
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # Her Pazartesi 06:00 UTC
+
+jobs:
+  npm-audit:
+    name: npm audit (frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Bağımlılıkları kur
+        working-directory: frontend
+        run: npm ci
+      - name: npm audit çalıştır
+        working-directory: frontend
+        run: npm audit || true
+
+  pip-audit:
+    name: pip-audit (backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: İzole ortamda backend bağımlılıklarını kur
+        # Sistem/runner Python'unu değil, YALNIZCA backend/requirements.txt'i
+        # tarar — CONTROL_PLAN_LOG.md Faz 7'de sistem Python'unun bu projeyle
+        # ilgisiz paketleri (yanlış pozitif) taradığı fark edilmişti, aynı
+        # hatayı burada tekrarlamamak için venv izolasyonu şart.
+        run: |
+          python -m venv .audit-venv
+          .audit-venv/bin/pip install --quiet -r backend/requirements.txt
+          .audit-venv/bin/pip install --quiet pip-audit
+      - name: pip-audit çalıştır
+        run: .audit-venv/bin/python -m pip_audit || true
