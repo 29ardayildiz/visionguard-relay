@@ -5,9 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import hub, state
 from ..core.limiter import limiter
+from ..core.limits import read_body_limited
 from ..core.security import get_current_user
 
 router = APIRouter(prefix="/api/camera")
+
+# Bir kamera ayarı isteğinin gerçek gövdesi (`{"key":"...","value":123}`)
+# birkaç on byte'tır — 10 KB, her türlü meşru payload'ın çok üzerinde ama
+# devasa bir JSON gövdesiyle bellek tüketimini engelleyecek kadar sıkı.
+SET_MAX_BYTES = 10 * 1024
 
 # ESP32-CAM (OV2640/benzeri) standart kamera API'sinin bilinen değer
 # aralıkları — Espressif'in resmi CameraWebServer örneğinin ve yaygın
@@ -53,7 +59,11 @@ async def get_camera_settings(_: str = Depends(get_current_user)):
 @router.post("/set")
 @limiter.limit("120/minute")
 async def set_camera_setting(request: Request, _: str = Depends(get_current_user)):
-    body = await request.json()
+    raw_body = await read_body_limited(request, SET_MAX_BYTES)
+    try:
+        body = json.loads(raw_body)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
     key = body.get("key")
     value = body.get("value")
 

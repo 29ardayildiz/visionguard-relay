@@ -12,9 +12,16 @@ from fastapi.responses import StreamingResponse
 from .. import hub, state
 from ..core import config
 from ..core.limiter import limiter
+from ..core.limits import read_body_limited
 from ..core.security import get_current_user
 
 router = APIRouter()
+
+# Gerçekçi bir ESP32-CAM JPEG frame'i (en yüksek çözünürlük/en düşük
+# sıkıştırmada bile) birkaç yüz KB'ı geçmez — 2 MB, hiçbir meşru frame'i
+# kesmeyecek kadar cömert ama SECRET_KEY'i ele geçiren birinin sınırsız
+# gövdeyle bellek tüketmesini (DoS) engelleyecek kadar sıkı bir tavan.
+PUSH_MAX_BYTES = 2 * 1024 * 1024
 
 
 # ── Stream endpoint ───────────────────────────────────────────────────────────
@@ -52,7 +59,7 @@ async def push_frame(request: Request):
     key = request.headers.get("X-Secret-Key")
     if key != config.SECRET_KEY:
         return Response("Unauthorized", status_code=401)
-    state.latest_frame = await request.body()
+    state.latest_frame = await read_body_limited(request, PUSH_MAX_BYTES)
     state.frame_times.append(time.monotonic())
     state.frame_event.set()
     await hub.broadcast_health()
