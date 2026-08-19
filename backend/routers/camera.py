@@ -9,6 +9,41 @@ from ..core.security import get_current_user
 
 router = APIRouter(prefix="/api/camera")
 
+# ESP32-CAM (OV2640/benzeri) standart kamera API'sinin bilinen değer
+# aralıkları — Espressif'in resmi CameraWebServer örneğinin ve yaygın
+# esp32-cam projelerinin camera_httpd implementasyonundaki genel bilgiye
+# dayanıyor (bu projenin ESP32 firmware kaynağına bakılmadan derlendi,
+# CLAUDE.md Kural 1 gereği o repo hiç açılmadı). Aralığı burada net
+# bilinmeyen alanlar (ör. "denoise") listede yok — onlar için yalnızca
+# tip kontrolü uygulanır, üst/alt sınır dayatılmaz.
+SETTING_RANGES: dict[str, tuple[int, int]] = {
+    "framesize": (0, 13),
+    "quality": (0, 63),
+    "brightness": (-2, 2),
+    "contrast": (-2, 2),
+    "saturation": (-2, 2),
+    "sharpness": (-2, 2),
+    "special_effect": (0, 6),
+    "whitebal": (0, 1),
+    "awb_gain": (0, 1),
+    "wb_mode": (0, 4),
+    "exposure_ctrl": (0, 1),
+    "aec2": (0, 1),
+    "ae_level": (-2, 2),
+    "aec_value": (0, 1200),
+    "gain_ctrl": (0, 1),
+    "agc_gain": (0, 30),
+    "gainceiling": (0, 6),
+    "bpc": (0, 1),
+    "wpc": (0, 1),
+    "raw_gma": (0, 1),
+    "lenc": (0, 1),
+    "hmirror": (0, 1),
+    "vflip": (0, 1),
+    "dcw": (0, 1),
+    "colorbar": (0, 1),
+}
+
 
 @router.get("/settings")
 async def get_camera_settings(_: str = Depends(get_current_user)):
@@ -24,6 +59,21 @@ async def set_camera_setting(request: Request, _: str = Depends(get_current_user
 
     if key not in state.camera_settings:
         raise HTTPException(status_code=400, detail=f"Unknown setting: {key}")
+
+    # `bool` Python'da `int`'in alt sınıfı olduğu için `isinstance` kullanmak
+    # JSON `true`/`false`'u da kabul ederdi — `type(value) is int` ile bunu
+    # kasıtlı olarak dışarıda bırakıyoruz, ESP32'ye her zaman düz bir tamsayı
+    # (`json.dumps`'ta `true` değil `1`/`0`) gitmesi garanti oluyor.
+    if type(value) is not int:
+        raise HTTPException(status_code=400, detail=f"'{key}' must be an integer")
+
+    value_range = SETTING_RANGES.get(key)
+    if value_range is not None:
+        low, high = value_range
+        if not (low <= value <= high):
+            raise HTTPException(
+                status_code=400, detail=f"'{key}' must be between {low} and {high}"
+            )
 
     state.camera_settings[key] = value
 
