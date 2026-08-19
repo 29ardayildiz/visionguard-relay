@@ -3,7 +3,8 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.types import Scope
+from starlette.middleware.gzip import GZipMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .routers import auth, camera, client_ws, stream
 
@@ -14,6 +15,28 @@ limiter = Limiter(key_func=get_remote_address)
 # kimlik doğrulaması olmadan ifşa ediyordu) — üçü de kapatıldı.
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
+
+
+class SelectiveGZipMiddleware:
+    """GZipMiddleware sarmalayıcısı — `/stream` (ESP32'den gelen, zaten
+    JPEG-sıkıştırılmış MJPEG canlı akışı) sıkıştırma kapsamı DIŞINDA
+    tutulur: JPEG verisi gzip ile neredeyse hiç küçülmez, her frame'i
+    tekrar sıkıştırmaya çalışmak canlı yayına gereksiz CPU yükü/gecikme
+    ekler. Diğer tüm response'lar (JSON API'ler, HTML, statik dosyalar)
+    normal şekilde sıkıştırılır."""
+
+    def __init__(self, app: ASGIApp, **gzip_kwargs: object) -> None:
+        self.app = app
+        self.gzip_app = GZipMiddleware(app, **gzip_kwargs)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["path"] == "/stream":
+            await self.app(scope, receive, send)
+        else:
+            await self.gzip_app(scope, receive, send)
+
+
+app.add_middleware(SelectiveGZipMiddleware, minimum_size=500)
 
 
 # ── Security headers middleware ───────────────────────────────────────────────
