@@ -1,14 +1,22 @@
 import time
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
+import jwt
 from fastapi import Cookie, HTTPException, Request, status
-from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from .. import state
 from . import config
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# ── Şifre doğrulama ────────────────────────────────────────────────────────────
+# `passlib` yerine doğrudan `bcrypt` kullanılıyor (REMEDIATION_PLAN_LOG.md
+# Faz 11) — `passlib` 2020'den beri güncellenmiyor ve `bcrypt`'in 4.1+
+# sürümleriyle bilinen bir uyumsuzluğu var, bu yüzden proje `bcrypt==4.0.1`'e
+# sabitlenmek zorunda kalmıştı. `ADMIN_PASSWORD_HASH` formatı ($2b$...)
+# değişmedi, mevcut hash'ler aynen çalışmaya devam ediyor.
+def verify_password(password: str, password_hash: str) -> bool:
+    return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
 # ── Brute-force protection ────────────────────────────────────────────────────
@@ -24,7 +32,12 @@ def record_failed_attempt(ip: str) -> None:
     state.failed_attempts.setdefault(ip, []).append(time.monotonic())
 
 
-# ── JWT helpers ───────────────────────────────────────────────────────────────
+# ── JWT helpers ─────────────────────────────────────────────────────────────────
+# `python-jose` yerine `PyJWT` kullanılıyor (REMEDIATION_PLAN_LOG.md Faz 11) —
+# daha aktif bakımlı, Python ekosisteminde JWT için yaygın standart; ayrıca
+# `python-jose[cryptography]`'nin gerektirdiği ama bu uygulamada hiç
+# kullanılmayan (yalnızca HS256 var, RSA/EC yok) `cryptography` bağımlılığı
+# da kalkmış oluyor. API şekli neredeyse birebir aynı, davranış değişmedi.
 def create_token(username: str) -> str:
     payload = {
         "sub": username,
@@ -40,9 +53,9 @@ def verify_token(token: str) -> str:
     try:
         data = jwt.decode(token, config.JWT_SECRET, algorithms=[config.JWT_ALGORITHM])
         if data.get("tv") != state.token_version:
-            raise JWTError("Token version mismatch (logout sonrası iptal edilmiş)")
+            raise jwt.InvalidTokenError("Token version mismatch (logout sonrası iptal edilmiş)")
         return data["sub"]
-    except JWTError:
+    except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 

@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 
 from .. import state
 from ..core import config
-from ..core.security import check_brute_force, create_token, pwd_context, record_failed_attempt
+from ..core.security import check_brute_force, create_token, record_failed_attempt, verify_password
 
 router = APIRouter()
 
@@ -20,7 +20,7 @@ async def login(
     ip = request.client.host
     check_brute_force(ip)
 
-    if username != config.ADMIN_USERNAME or not pwd_context.verify(password, config.ADMIN_PASSWORD_HASH):
+    if username != config.ADMIN_USERNAME or not verify_password(password, config.ADMIN_PASSWORD_HASH):
         record_failed_attempt(ip)
         return RedirectResponse(url="/login?error=1", status_code=303)
 
