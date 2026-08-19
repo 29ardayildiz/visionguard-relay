@@ -11,14 +11,19 @@ from fastapi.responses import StreamingResponse
 
 from .. import hub, state
 from ..core import config
+from ..core.limiter import limiter
 from ..core.security import get_current_user
 
 router = APIRouter()
 
 
 # ── Stream endpoint ───────────────────────────────────────────────────────────
+# /push ve /ws (ESP32 kanalı) BİLİNÇLİ OLARAK rate-limit dışında — ESP32'nin
+# frame gönderme hızı zaten donanım tarafından sınırlı, buraya limit eklemek
+# CLAUDE.md'nin dokunulmaz saydığı kanalı riske atabilir.
 @router.get("/stream")
-async def stream(_: str = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def stream(request: Request, _: str = Depends(get_current_user)):
     async def generate():
         while True:
             await state.frame_event.wait()
@@ -36,7 +41,8 @@ async def stream(_: str = Depends(get_current_user)):
 
 # ── Health endpoint ───────────────────────────────────────────────────────────
 @router.get("/health")
-async def health(_: str = Depends(get_current_user)):
+@limiter.limit("60/minute")
+async def health(request: Request, _: str = Depends(get_current_user)):
     return {"status": "ok", **state.health_snapshot()}
 
 

@@ -1,20 +1,27 @@
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from .core.limiter import limiter
 from .routers import auth, camera, client_ws, stream
 
 # ── App ───────────────────────────────────────────────────────────────────────
-limiter = Limiter(key_func=get_remote_address)
 # Swagger/ReDoc/OpenAPI şeması yalnızca dahili kullanım içindi ama varsayılan
 # ayarla herkese açık kalıyordu (tüm route/parametre/response şemasını
 # kimlik doğrulaması olmadan ifşa ediyordu) — üçü de kapatıldı.
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# İlgili route'lardaki @limiter.limit(...) dekoratörlerini gerçekten
+# devreye sokan katman — Limiter instance'ı tek başına yeterli değil.
+# /push ve /ws (ESP32 kanalı) hiçbir route'ta limit dekoratörü taşımıyor,
+# bu yüzden bu middleware onları da etkilemez.
+app.add_middleware(SlowAPIMiddleware)
 
 
 class SelectiveGZipMiddleware:

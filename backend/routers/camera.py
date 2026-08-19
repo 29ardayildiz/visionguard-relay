@@ -4,6 +4,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import hub, state
+from ..core.limiter import limiter
 from ..core.security import get_current_user
 
 router = APIRouter(prefix="/api/camera")
@@ -15,6 +16,7 @@ async def get_camera_settings(_: str = Depends(get_current_user)):
 
 
 @router.post("/set")
+@limiter.limit("120/minute")
 async def set_camera_setting(request: Request, _: str = Depends(get_current_user)):
     body = await request.json()
     key = body.get("key")
@@ -36,7 +38,8 @@ async def set_camera_setting(request: Request, _: str = Depends(get_current_user
 
 
 @router.post("/apply_all")
-async def apply_all_settings(_: str = Depends(get_current_user)):
+@limiter.limit("20/minute")
+async def apply_all_settings(request: Request, _: str = Depends(get_current_user)):
     if state.esp32_websocket is None:
         return {"status": "ok", "applied": 0, "note": "push_mode"}
     count = 0
@@ -52,7 +55,8 @@ async def apply_all_settings(_: str = Depends(get_current_user)):
 
 
 @router.post("/get_from_esp")
-async def get_from_esp(_: str = Depends(get_current_user)):
+@limiter.limit("20/minute")
+async def get_from_esp(request: Request, _: str = Depends(get_current_user)):
     if state.esp32_websocket is None:
         raise HTTPException(status_code=503, detail="ESP32 WebSocket not connected (push-only mode)")
     state.esp32_settings_event.clear()
