@@ -51,6 +51,10 @@ async def security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = (
         "geolocation=(), microphone=(), camera=(), usb=(), payment=()"
     )
+    # Kişisel/tek-kullanıcılı bir kamera uygulaması — robots.txt ve <meta
+    # name="robots"> yanında, tüm response'larda (API dahil) arama motoru
+    # botlarına indexleme yapmamalarını söyleyen üçüncü katman.
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
     # Vite'ın içerik-hash'li /assets/* dosyaları güvenle sonsuza kadar
     # cache'lenebilir (dosya adı değişmeden içerik değişmez). Diğer her şey
     # (index.html, API yanıtları) no-store kalır — özellikle login/admin
