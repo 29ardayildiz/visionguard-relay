@@ -47,6 +47,19 @@ esp32_settings_event = asyncio.Event()
 # ── Brute-force protection ────────────────────────────────────────────────────
 failed_attempts: dict[str, list[float]] = {}
 
+# ── Oturum sürüm sayacı ────────────────────────────────────────────────────────
+# JWT stateless olduğu için normalde sunucu tarafında tek tek iptal edilemez —
+# bu sayaç bir "epoch" görevi görüyor: her token'a üretildiği andaki sürüm
+# damgası (`tv` claim'i) gömülür, doğrulamada mevcut sürümle karşılaştırılır.
+# Logout sayacı artırır — o ana kadar üretilmiş TÜM token'lar (hangi cihazda
+# olursa olsun) anında geçersiz olur. Tek-kullanıcılı modelde bu kabul
+# edilebilir bir trade-off: birden fazla cihazda oturum açıksa, birinde çıkış
+# yapmak diğerlerini de düşürür — ama zaten tek admin kullanıcısı için bu
+# "tüm oturumları kapat" davranışı arzu edilen sonuç. Sunucu yeniden
+# başladığında 0'a döner, bu da tüm state'in bellek içi olduğu mimariyle
+# tutarlı (bkz. REMEDIATION_PLAN_LOG.md Faz 10).
+token_version: int = 0
+
 # ── Browser client channel (/ws/client) ───────────────────────────────────────
 browser_clients: set[WebSocket] = set()
 

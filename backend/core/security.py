@@ -28,6 +28,9 @@ def record_failed_attempt(ip: str) -> None:
 def create_token(username: str) -> str:
     payload = {
         "sub": username,
+        # Logout'ta sunucu tarafında gerçek iptal sağlayan sürüm damgası —
+        # bkz. state.py'deki token_version tanımı.
+        "tv": state.token_version,
         "exp": datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRE_HOURS),
     }
     return jwt.encode(payload, config.JWT_SECRET, algorithm=config.JWT_ALGORITHM)
@@ -36,6 +39,8 @@ def create_token(username: str) -> str:
 def verify_token(token: str) -> str:
     try:
         data = jwt.decode(token, config.JWT_SECRET, algorithms=[config.JWT_ALGORITHM])
+        if data.get("tv") != state.token_version:
+            raise JWTError("Token version mismatch (logout sonrası iptal edilmiş)")
         return data["sub"]
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")

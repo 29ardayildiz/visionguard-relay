@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 
+from .. import state
 from ..core import config
 from ..core.security import check_brute_force, create_token, pwd_context, record_failed_attempt
 
@@ -38,6 +39,10 @@ async def login(
 
 @router.get("/logout")
 async def logout():
+    # Cookie'yi silmek yeterli değil — JWT stateless olduğu için eski token
+    # hâlâ geçerli kalırdı. Sürüm sayacını artırmak, o ana kadar üretilmiş
+    # TÜM token'ları (bu isteğin cookie'sindeki dahil) anında geçersiz kılar.
+    state.token_version += 1
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie("token")
     return response
