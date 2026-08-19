@@ -9,7 +9,10 @@ from .routers import auth, camera, client_ws, stream
 
 # ── App ───────────────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address)
-app = FastAPI()
+# Swagger/ReDoc/OpenAPI şeması yalnızca dahili kullanım içindi ama varsayılan
+# ayarla herkese açık kalıyordu (tüm route/parametre/response şemasını
+# kimlik doğrulaması olmadan ifşa ediyordu) — üçü de kapatıldı.
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
 
 
